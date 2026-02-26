@@ -3009,7 +3009,14 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                           <p className="text-gray-500 dark:text-gray-400 text-xs">R$ {s.price.toFixed(2)} • {formatDuration(s.duration)}</p>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <button onClick={() => { setEditingService(s); setIsEditing(true); }} className="size-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-blue-500 dark:text-blue-400 transition-colors"><span className="material-symbols-outlined text-sm">edit</span></button>
+                          <button onClick={() => {
+                            setEditingService(s);
+                            setIsEditing(true);
+                            const d = Math.floor(s.duration / (24 * 60));
+                            const h = Math.floor((s.duration % (24 * 60)) / 60);
+                            const m = s.duration % 60;
+                            setDurationParts({ days: d, hours: h, mins: m });
+                          }} className="size-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-blue-500 dark:text-blue-400 transition-colors"><span className="material-symbols-outlined text-sm">edit</span></button>
                           <button onClick={() => handleDelete(s.id)} className="size-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-red-500 dark:text-red-400 transition-colors"><span className="material-symbols-outlined text-sm">delete</span></button>
                         </div>
                       </div>
@@ -3024,7 +3031,7 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       </main>
       <div className="fixed bottom-6 right-6 z-50">
-        <button onClick={() => { setEditingService({}); setIsEditing(true); }} className="size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transition-transform active:scale-95">
+        <button onClick={() => { setEditingService({}); setDurationParts({ days: 0, hours: 0, mins: 0 }); setIsEditing(true); }} className="size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transition-transform active:scale-95">
           <span className="material-symbols-outlined text-2xl">add</span>
         </button>
       </div>
