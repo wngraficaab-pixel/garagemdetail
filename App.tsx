@@ -428,7 +428,7 @@ const HomeScreen: React.FC<{
 );
 
 const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispatch<React.SetStateAction<BookingState>>; customerPhone: string; customerName: string }> = ({ onBack, setBooking, customerPhone, customerName }) => {
-  const [step, setStep] = useState<'IDENTIFY' | 'VEHICLE' | 'POLISHING' | 'UPHOLSTERY' | 'SUCCESS'>(customerPhone ? 'VEHICLE' : 'IDENTIFY');
+  const [step, setStep] = useState<'IDENTIFY' | 'VEHICLE' | 'SERVICES' | 'SUCCESS'>(customerPhone ? 'VEHICLE' : 'IDENTIFY');
   const [loading, setLoading] = useState(false);
   const [tempIdentify, setTempIdentify] = useState({ name: customerName, phone: customerPhone });
   const [quoteData, setQuoteData] = useState({
@@ -600,127 +600,109 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
 
             <button
               disabled={!quoteData.vehicleColor || !quoteData.vehicleModelYear || quoteData.vehiclePhotos.length === 0}
-              onClick={() => setStep('POLISHING')}
+              onClick={() => setStep('SERVICES')}
               className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
             >
-              Próximo: Polimento
+              Próximo: Escolher Serviços
             </button>
           </div>
         )}
 
-        {step === 'POLISHING' && (
+        {step === 'SERVICES' && (
           <div className="space-y-6 animate-enter">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Tipo de Polimento</h3>
-              <p className="text-sm text-gray-500 text-center mb-6">Escolha o nível de proteção e brilho para sua pintura.</p>
-            </div>
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Tipos de Polimento</h3>
+                <p className="text-sm text-gray-500 text-center mb-6">Escolha o nível de proteção e brilho para sua pintura.</p>
+              </div>
 
-            <div className="space-y-4">
-              {[
-                {
-                  id: 'COMERCIAL',
-                  title: 'Comercial',
-                  desc: 'Utilizando uma etapa esse polimento abre o brilho da pintura, elimina arranhões superficiais e mascara os mais profundos após isso é aplicado um selante cerâmico com proteção de até 7 meses.'
-                },
-                {
-                  id: 'TECNICO',
-                  title: 'Polimento Técnico',
-                  desc: 'Com várias etapas eliminamos o máximo de arranhões possíveis de acordo com a espessura do verniz, trazendo assim um brilho extremo a pintura, após o polimento a pintura é vitrificada (Coating Nano-Cerâmico a base de SIO2) para proteger e promover muito mais brilho e hidrorepelência com duração de até 3 anos.'
-                },
-                {
-                  id: 'MAQUIAGEM',
-                  title: 'Maquiagem Automotiva',
-                  desc: 'Cera de alta tecnologia e performance aplicada na pintura que promove brilho intenso e máscara a maior parte dos defeitos, com proteção contra o tempo e hidrorepelência que duram até 4 meses.'
-                }
-              ].map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => setQuoteData({ ...quoteData, polishingType: p.id as any })}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all ${quoteData.polishingType === p.id ? 'bg-primary/10 border-primary ring-1 ring-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className={`font-bold ${quoteData.polishingType === p.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{p.title}</span>
-                    {quoteData.polishingType === p.id && <span className="material-symbols-outlined text-primary text-sm">check_circle</span>}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">{p.desc}</p>
-                </button>
-              ))}
-            </div>
+              <div className="space-y-4">
+                {[
+                  {
+                    id: 'COMERCIAL',
+                    title: 'Comercial',
+                    desc: 'Utilizando uma etapa esse polimento abre o brilho da pintura, elimina arranhões superficiais e mascara os mais profundos após isso é aplicado um selante cerâmico com proteção de até 7 meses.'
+                  },
+                  {
+                    id: 'TECNICO',
+                    title: 'Polimento Técnico',
+                    desc: 'Com várias etapas eliminamos o máximo de arranhões possíveis de acordo com a espessura do verniz, trazendo assim um brilho extremo a pintura, após o polimento a pintura é vitrificada (Coating Nano-Cerâmico a base de SIO2) para proteger e promover muito mais brilho e hidrorepelência com duração de até 3 anos.'
+                  },
+                  {
+                    id: 'MAQUIAGEM',
+                    title: 'Maquiagem Automotiva',
+                    desc: 'Cera de alta tecnologia e performance aplicada na pintura que promove brilho intenso e máscara a maior parte dos defeitos, com proteção contra o tempo e hidrorepelência que duram até 4 meses.'
+                  }
+                ].map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setQuoteData({ ...quoteData, polishingType: p.id as any })}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all ${quoteData.polishingType === p.id ? 'bg-primary/10 border-primary ring-1 ring-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`font-bold ${quoteData.polishingType === p.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{p.title}</span>
+                      {quoteData.polishingType === p.id && <span className="material-symbols-outlined text-primary text-sm">check_circle</span>}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">{p.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
 
-            <div className="flex gap-3">
+            <section className="space-y-4 pt-4 border-t border-gray-100 dark:border-white/5">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Higienização de Estofados</h3>
+                <p className="text-xs text-gray-500 text-center mb-2 leading-relaxed">
+                  Limpeza processo VSC, extrai sujeira, mata fungos/bactérias. Inclui detalhamento interno.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {['BANCOS', 'CARPETE', 'TETO'].map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      const exists = quoteData.upholsteryOptions.includes(opt);
+                      setQuoteData({
+                        ...quoteData,
+                        upholsteryOptions: exists
+                          ? quoteData.upholsteryOptions.filter(o => o !== opt)
+                          : [...quoteData.upholsteryOptions, opt]
+                      });
+                    }}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${quoteData.upholsteryOptions.includes(opt) ? 'bg-primary/10 border-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
+                  >
+                    <span className={`font-bold text-sm ${quoteData.upholsteryOptions.includes(opt) ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{opt}</span>
+                    <span className={`material-symbols-outlined ${quoteData.upholsteryOptions.includes(opt) ? 'text-primary' : 'text-gray-300'}`}>
+                      {quoteData.upholsteryOptions.includes(opt) ? 'check_box' : 'check_box_outline_blank'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-slate-700 dark:text-gray-300">Fotos do Estado (Higienização)</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {quoteData.upholsteryPhotos.map((p, i) => (
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
+                      <img src={p} className="w-full h-full object-cover" />
+                      <button onClick={() => removePhoto(i, 'upholsteryPhotos')} className="absolute top-1 right-1 size-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="material-symbols-outlined text-[10px]">close</span>
+                      </button>
+                    </div>
+                  ))}
+                  <label className="aspect-square border-2 border-dashed border-gray-300 dark:border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <input type="file" multiple accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'upholsteryPhotos')} />
+                    <span className="material-symbols-outlined text-gray-400">add_a_photo</span>
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <div className="flex gap-3 pt-6">
               <button onClick={() => setStep('VEHICLE')} className="flex-1 py-4 text-gray-500 font-bold">Voltar</button>
               <button
-                disabled={!quoteData.polishingType}
-                onClick={() => setStep('UPHOLSTERY')}
-                className="flex-[2] bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
-              >
-                Próximo: Higienização
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 'UPHOLSTERY' && (
-          <div className="space-y-6 animate-enter">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Higienização de Estofados</h3>
-              <p className="text-sm text-gray-500 text-center mb-2">Selecione o que deseja incluir.</p>
-              <p className="text-[11px] text-gray-400 text-center leading-relaxed max-w-[280px] mx-auto italic">
-                Limpeza feita pelo processo VSC, extrai completamente a sujeira do tecido, mata todo tipo de fungos e bactérias e previne uma futura proliferação dos mesmo.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              {['BANCOS', 'CARPETE', 'TETO'].map(opt => (
-                <button
-                  key={opt}
-                  onClick={() => {
-                    const exists = quoteData.upholsteryOptions.includes(opt);
-                    setQuoteData({
-                      ...quoteData,
-                      upholsteryOptions: exists
-                        ? quoteData.upholsteryOptions.filter(o => o !== opt)
-                        : [...quoteData.upholsteryOptions, opt]
-                    });
-                  }}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${quoteData.upholsteryOptions.includes(opt) ? 'bg-primary/10 border-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
-                >
-                  <span className={`font-bold text-sm ${quoteData.upholsteryOptions.includes(opt) ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{opt}</span>
-                  <span className={`material-symbols-outlined ${quoteData.upholsteryOptions.includes(opt) ? 'text-primary' : 'text-gray-300'}`}>
-                    {quoteData.upholsteryOptions.includes(opt) ? 'check_box' : 'check_box_outline_blank'}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-slate-700 dark:text-gray-300">Fotos do Estado (Manchas, sujeira, etc.)</p>
-              <div className="grid grid-cols-4 gap-2">
-                {quoteData.upholsteryPhotos.map((p, i) => (
-                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
-                    <img src={p} className="w-full h-full object-cover" />
-                    <button onClick={() => removePhoto(i, 'upholsteryPhotos')} className="absolute top-1 right-1 size-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="material-symbols-outlined text-[10px]">close</span>
-                    </button>
-                  </div>
-                ))}
-                <label className="aspect-square border-2 border-dashed border-gray-300 dark:border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                  <input type="file" multiple accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'upholsteryPhotos')} />
-                  <span className="material-symbols-outlined text-gray-400">add_a_photo</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-200 dark:border-white/5">
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed italic">
-                O serviço é entregue com o detalhamento e hidratação interna e limpeza simples na parte externa.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setStep('POLISHING')} className="flex-1 py-4 text-gray-500 font-bold">Voltar</button>
-              <button
-                disabled={loading}
+                disabled={loading || (!quoteData.polishingType && quoteData.upholsteryOptions.length === 0)}
                 onClick={handleSubmit}
                 className="flex-[2] bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center"
               >
