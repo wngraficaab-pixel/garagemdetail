@@ -617,9 +617,8 @@ const SelectDateTimeScreen: React.FC<{
 
       while (true) {
         const currentSlotStart = h * 60 + m;
-        const currentSlotEnd = currentSlotStart + myDuration;
-
-        if (currentSlotEnd > shiftEndMins) break;
+        // Permissive logic: only check if the start time is within business hours
+        if (currentSlotStart >= shiftEndMins) break;
 
         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
@@ -629,7 +628,6 @@ const SelectDateTimeScreen: React.FC<{
 
         if (isToday) {
           const nowMins = now.getHours() * 60 + now.getMinutes();
-          // Enforce Minimum Advance Time
           if (currentSlotStart <= (nowMins + minAdvance)) isPast = true;
         }
 
@@ -638,7 +636,8 @@ const SelectDateTimeScreen: React.FC<{
           for (const bloc of blockedSlots) {
             if (bloc.date === selectedDateStr) {
               const blockStart = toMins(bloc.time);
-              if (blockStart >= currentSlotStart && blockStart < currentSlotEnd) {
+              // Check if THIS start time is blocked (use a 1-min window for check)
+              if (currentSlotStart >= blockStart && currentSlotStart < (blockStart + 15)) {
                 isBlocked = true;
                 break;
               }
@@ -650,7 +649,8 @@ const SelectDateTimeScreen: React.FC<{
               if (app.date === selectedDateStr && app.status !== 'CANCELLED') {
                 const appStart = toMins(app.time);
                 const appEnd = appStart + app.duration;
-                if (currentSlotStart < appEnd && currentSlotEnd > appStart) {
+                // Check if our selected start time falls within an existing appointment
+                if (currentSlotStart >= appStart && currentSlotStart < appEnd) {
                   isBlocked = true;
                   break;
                 }
