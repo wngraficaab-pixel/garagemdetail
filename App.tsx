@@ -985,14 +985,43 @@ const SelectDateTimeScreen: React.FC<{
         return hh * 60 + mm;
       };
 
+      const toleranceMins = Number(localStorage.getItem('booking_tolerance') || '45');
+      const lunchStartStr = localStorage.getItem('lunch_start') || '';
+      const lunchEndStr = localStorage.getItem('lunch_end') || '';
+
+      const lunchStartMins = lunchStartStr ? toMins(lunchStartStr) : null;
+      const lunchEndMins = lunchEndStr ? toMins(lunchEndStr) : null;
+
       while (true) {
         const currentSlotStart = h * 60 + m;
-        // If duration is <= 1 day (1440 mins), it must FIT in the current shift
+
+        // --- 1. Shift End Check ---
+        // If duration is <= 1 day, it must fit in the current shift (considering tolerance)
         if (myDuration <= 1440) {
-          if (currentSlotStart + myDuration > shiftEndMins) break;
+          if (currentSlotStart + myDuration > (shiftEndMins + toleranceMins)) break;
         } else {
           // If duration is > 1 day, it just needs to START within the shift
           if (currentSlotStart >= shiftEndMins) break;
+        }
+
+        // --- 2. Lunch Check (Only for single-day services) ---
+        if (myDuration <= 1440 && lunchStartMins !== null && lunchEndMins !== null) {
+          const slotEndMins = currentSlotStart + myDuration;
+
+          // Case A: Slot starts before lunch and ends after lunch starts (exceeding tolerance)
+          if (currentSlotStart < lunchStartMins && slotEndMins > (lunchStartMins + toleranceMins)) {
+            // Skip this slot
+            m += step;
+            if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
+            continue;
+          }
+
+          // Case B: Slot starts during lunch
+          if (currentSlotStart >= lunchStartMins && currentSlotStart < lunchEndMins) {
+            m += step;
+            if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
+            continue;
+          }
         }
 
         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -2183,6 +2212,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [companyName, setCompanyName] = useState('Garagem Detail');
   const [companyTagline, setCompanyTagline] = useState('Seu estilo, no seu tempo. Agende seu corte em segundos.');
   const [companyAddress, setCompanyAddress] = useState('Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
+  const [tolerance, setTolerance] = useState('45');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -2200,6 +2230,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setCompanyName(s.company_name || 'Garagem Detail');
         setCompanyTagline(s.company_tagline || 'Seu estilo, no seu tempo. Agende seu corte em segundos.');
         setCompanyAddress(s.company_address || 'Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
+        setTolerance(s.booking_tolerance || '45');
       }
     };
     loadSettings();
@@ -2216,7 +2247,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       { key: 'profile_image', value: profileImage },
       { key: 'company_name', value: companyName },
       { key: 'company_tagline', value: companyTagline },
-      { key: 'company_address', value: companyAddress }
+      { key: 'company_address', value: companyAddress },
+      { key: 'booking_tolerance', value: tolerance }
     ];
 
     const { error } = await supabase.from('settings').upsert(updates);
@@ -2229,6 +2261,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       localStorage.setItem('company_address', companyAddress);
       localStorage.setItem('profile_name', profileName);
       localStorage.setItem('profile_image', profileImage);
+      localStorage.setItem('booking_tolerance', tolerance);
     }
   };
 
@@ -2294,6 +2327,19 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div>
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Fim do Almoço (Opcional)</label>
             <input type="time" value={lunchEnd} onChange={e => setLunchEnd(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" />
+          </div>
+          <div>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Tolerância de Finalização (min)</label>
+            <select value={tolerance} onChange={e => setTolerance(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white">
+              <option value="0">Sem tolerância</option>
+              <option value="15">15 minutos</option>
+              <option value="30">30 minutos</option>
+              <option value="45">45 minutos</option>
+              <option value="60">1 hora</option>
+              <option value="90">1 hora e 30 min</option>
+              <option value="120">2 horas</option>
+            </select>
+            <p className="text-[10px] text-gray-400 mt-1 italic">Tempo extra permitido além do fim do expediente ou início do almoço para concluir um serviço.</p>
           </div>
           <button onClick={handleSave} className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 mt-4 active:scale-[0.98] transition-all">Salvar Alterações</button>
         </div>
