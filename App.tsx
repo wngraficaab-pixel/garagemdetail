@@ -3081,15 +3081,25 @@ const App: React.FC = () => {
         // Group similar hours
         const groups: { [key: string]: number[] } = {};
         data.forEach((w: any) => {
-          const timeRange = `${w.start_time.slice(0, 5)} - ${w.end_time.slice(0, 5)}`;
-          if (!groups[timeRange]) groups[timeRange] = [];
-          groups[timeRange].push(w.day_of_week);
+          let range = '';
+          if (w.is_morning_open && w.start_time_1 && w.end_time_1) {
+            range += `${w.start_time_1.slice(0, 5)} - ${w.end_time_1.slice(0, 5)}`;
+          }
+          if (w.is_afternoon_open && w.start_time_2 && w.end_time_2) {
+            if (range) range += ' e ';
+            range += `${w.start_time_2.slice(0, 5)} - ${w.end_time_2.slice(0, 5)}`;
+          }
+
+          if (!range) return;
+          if (!groups[range]) groups[range] = [];
+          groups[range].push(w.day_of_week);
         });
 
         const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
         const formatted = Object.entries(groups).map(([range, days]) => {
-          if (days.length === 5 && days.every(d => d >= 1 && d <= 5)) return `Seg - Sex: ${range}`;
-          if (days.length === 6 && days.every(d => d >= 1 && d <= 6)) return `Seg - Sáb: ${range}`;
+          days.sort((a, b) => a - b);
+          if (days.length === 5 && days[0] === 1 && days[4] === 5) return `Seg - Sex: ${range}`;
+          if (days.length === 6 && days[0] === 1 && days[5] === 6) return `Seg - Sáb: ${range}`;
           const label = days.map(d => dayNames[d]).join(', ');
           return `${label}: ${range}`;
         });
