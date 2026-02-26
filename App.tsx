@@ -871,7 +871,7 @@ const SelectServicesScreen: React.FC<{
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 flex items-start gap-3 mt-8">
             <span className="material-symbols-outlined text-blue-500 shrink-0">info</span>
             <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-              Para realizar um polimento, é necessário fazer um orçamento personalizado, retorne ao menu inicial e selecione o botão <strong>"Fazer o seu Orçamento Personalizado"</strong>.
+              Para realizar um polimento, é necessário fazer um orçamento personalizado, retorne ao menu inicial e selecione o botão <strong>"Fazer orçamento personalizado"</strong>.
             </p>
           </div>
         </div>
