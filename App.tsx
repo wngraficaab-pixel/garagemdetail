@@ -2780,14 +2780,20 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const fetchQuotes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('quotes')
       .select('*, client:clients(name, phone)')
       .order('created_at', { ascending: false });
 
+    if (!showCompleted) {
+      query = query.neq('status', 'COMPLETED');
+    }
+
+    const { data, error } = await query;
     if (!error && data) {
       setQuotes(data);
     }
@@ -2796,7 +2802,7 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   useEffect(() => {
     fetchQuotes();
-  }, []);
+  }, [showCompleted]);
 
   const handleUpdateStatus = async (quoteId: string, status: string) => {
     const { error } = await supabase.from('quotes').update({ status }).eq('id', quoteId);
@@ -2818,7 +2824,16 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       <header className="sticky top-0 z-50 p-4 border-b border-gray-200 dark:border-white/5 bg-white/95 dark:bg-background-dark/95 flex items-center justify-between backdrop-blur-md transition-colors">
         <button onClick={onBack} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">arrow_back</span></button>
         <h2 className="font-bold text-slate-900 dark:text-white">Orçamentos Recebidos</h2>
-        <button onClick={fetchQuotes} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">refresh</span></button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className={`size-10 rounded-full flex items-center justify-center transition-colors ${showCompleted ? 'bg-primary text-white' : 'hover:bg-black/5 dark:hover:bg-white/10 text-gray-500'}`}
+            title={showCompleted ? "Esconder Concluídos" : "Mostrar Concluídos"}
+          >
+            <span className="material-symbols-outlined">{showCompleted ? 'visibility_off' : 'visibility'}</span>
+          </button>
+          <button onClick={fetchQuotes} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">refresh</span></button>
+        </div>
       </header>
 
       <main className="p-4 space-y-4 max-w-4xl mx-auto w-full pb-24">
@@ -2879,6 +2894,18 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     className="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-sm">chat</span> WhatsApp
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm('Deseja finalizar este orçamento? Ele sairá da lista principal.')) {
+                        handleUpdateStatus(quote.id, 'COMPLETED');
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20"
+                    title="Finalizar"
+                  >
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
                   </button>
                   <button
                     onClick={(e) => {
@@ -2991,7 +3018,7 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         : 'bg-white dark:bg-background-dark text-gray-400 border border-gray-100 dark:border-white/5'
                         }`}
                     >
-                      {status === 'PENDING' ? 'Pendente' : status === 'REPLIED' ? 'Respondido' : 'Concluído'}
+                      {status === 'PENDING' ? 'Pendente' : status === 'REPLIED' ? 'Respondido' : 'Finalizar'}
                     </button>
                   ))}
                 </div>
@@ -3019,7 +3046,8 @@ const AdminDashboard: React.FC<{
   onClients: () => void;
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   unreadCount: number;
-}> = ({ appointments, onLogout, onOpenChat, onManageServices, onBlockSchedule, onSettings, onWeeklySchedule, onFinance, onQuotes, onTV, onRefresh, onClients, setAppointments, unreadCount }) => {
+  unreadQuotesCount: number;
+}> = ({ appointments, onLogout, onOpenChat, onManageServices, onBlockSchedule, onSettings, onWeeklySchedule, onFinance, onQuotes, onTV, onRefresh, onClients, setAppointments, unreadCount, unreadQuotesCount }) => {
   const availableDays = useMemo(() => getNextDays(7), []);
   const [selectedDateStr, setSelectedDateStr] = useState(availableDays[0].dateStr); // Default to local today string
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -3142,6 +3170,11 @@ const AdminDashboard: React.FC<{
             onClick={onQuotes}
             className="relative group flex flex-col p-4 rounded-3xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 hover:border-primary/30 active:scale-[0.98] transition-all overflow-hidden shadow-lg h-32 justify-between"
           >
+            {unreadQuotesCount > 0 && (
+              <div className="absolute top-3 right-3 size-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm animate-bounce-custom">
+                {unreadQuotesCount}
+              </div>
+            )}
             <div className="size-10 rounded-xl bg-violet-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/20">
               <span className="material-symbols-outlined filled">description</span>
             </div>
@@ -4074,6 +4107,7 @@ const App: React.FC = () => {
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadQuotesCount, setUnreadQuotesCount] = useState(0);
   const prevUnreadCountRef = useRef(0);
   const [notificationState, setNotificationState] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
 
@@ -4110,6 +4144,13 @@ const App: React.FC = () => {
         .eq('is_read', false)
         .eq('sender_type', 'CUSTOMER');
       setUnreadCount(count || 0);
+
+      const { count: quoteCount } = await supabase
+        .from('quotes')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_read', false)
+        .neq('status', 'COMPLETED');
+      setUnreadQuotesCount(quoteCount || 0);
     }
 
     // Client-side filtering for customer (or do it in RLS/query filter if simple)
@@ -4366,6 +4407,7 @@ const App: React.FC = () => {
         return <AdminDashboard
           appointments={appointments}
           unreadCount={unreadCount}
+          unreadQuotesCount={unreadQuotesCount}
           onLogout={() => {
             localStorage.removeItem('admin_auth');
             supabase.auth.signOut();
@@ -4381,7 +4423,13 @@ const App: React.FC = () => {
 
           onRefresh={fetchAppointments}
           onClients={() => setView('ADMIN_CLIENTS')}
-          onQuotes={() => setView('ADMIN_QUOTES')}
+          onQuotes={() => {
+            setView('ADMIN_QUOTES');
+            // Mark all quotes as read when entering the screen
+            supabase.from('quotes').update({ is_read: true }).eq('is_read', false).then(() => {
+              setUnreadQuotesCount(0);
+            });
+          }}
           setAppointments={setAppointments}
         />;
       case 'ADMIN_SERVICES':

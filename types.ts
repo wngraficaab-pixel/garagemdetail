@@ -31,6 +31,7 @@ export interface Quote {
   upholstery_options: string[];
   upholstery_photos: string[];
   status: 'PENDING' | 'REPLIED' | 'COMPLETED';
+  is_read: boolean;
   created_at: string;
   client?: {
     name: string;
