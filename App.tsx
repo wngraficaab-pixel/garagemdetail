@@ -645,12 +645,15 @@ const SelectDateTimeScreen: React.FC<{
           }
 
           if (!isBlocked) {
+            const slotStart = new Date(`${selectedDateStr}T${timeStr}:00`).getTime();
+
             for (const app of existingAppointments) {
-              if (app.date === selectedDateStr && app.status !== 'CANCELLED') {
-                const appStart = toMins(app.time);
-                const appEnd = appStart + app.duration;
-                // Check if our selected start time falls within an existing appointment
-                if (currentSlotStart >= appStart && currentSlotStart < appEnd) {
+              if (app.status !== 'CANCELLED') {
+                const appStart = new Date(`${app.date}T${app.time}:00`).getTime();
+                const appEnd = appStart + (app.duration * 60000);
+
+                // If the current slot start falls anywhere within the appointment duration
+                if (slotStart >= appStart && slotStart < appEnd) {
                   isBlocked = true;
                   break;
                 }
