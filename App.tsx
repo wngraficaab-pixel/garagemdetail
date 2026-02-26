@@ -286,8 +286,12 @@ const LandingScreen: React.FC<{ onStart: () => void; onAdmin: () => void }> = ({
         <div className="mb-6 h-32 w-32 flex items-center justify-center">
           <img src="/logo.png" alt="Logo Garagem Detail" className="h-full w-full object-contain" />
         </div>
-        <h1 className="text-slate-900 dark:text-white tracking-tight text-4xl font-extrabold leading-tight text-center mb-3">Garagem Detail</h1>
-        <p className="text-gray-600 dark:text-gray-300 text-base text-center max-w-xs opacity-90">Seu estilo, no seu tempo.<br />Agende seu corte em segundos.</p>
+        <h1 className="text-slate-900 dark:text-white tracking-tight text-4xl font-extrabold leading-tight text-center mb-3">
+          {localStorage.getItem('company_name') || "Garagem Detail"}
+        </h1>
+        <p className="text-gray-600 dark:text-gray-300 text-base text-center max-w-xs opacity-90 whitespace-pre-line">
+          {localStorage.getItem('company_tagline') || "Seu estilo, no seu tempo.\nAgende seu corte em segundos."}
+        </p>
       </div>
     </div>
     <div className="flex-1 flex flex-col justify-start px-6 pt-8 pb-8 gap-4 w-full max-w-md mx-auto">
@@ -311,7 +315,9 @@ const HomeScreen: React.FC<{
   <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden pb-24 bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark transition-colors">
     <header className="sticky top-0 z-50 flex items-center justify-center bg-white/95 dark:bg-background-dark/95 backdrop-blur-md px-4 py-3 border-b border-gray-200 dark:border-white/5 gap-2 transition-colors">
       <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-      <h2 className="text-lg font-bold leading-tight tracking-tight text-center text-slate-900 dark:text-white">Garagem Detail</h2>
+      <h2 className="text-lg font-bold leading-tight tracking-tight text-center text-slate-900 dark:text-white">
+        {localStorage.getItem('company_name') || "Garagem Detail"}
+      </h2>
     </header>
     <main className="flex-1 flex flex-col px-4 pt-4">
       <div className="mb-4">
@@ -1758,6 +1764,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [lunchEnd, setLunchEnd] = useState('');
   const [profileName, setProfileName] = useState('Renan Sandes');
   const [profileImage, setProfileImage] = useState('/renan.png');
+  const [companyName, setCompanyName] = useState('Garagem Detail');
+  const [companyTagline, setCompanyTagline] = useState('Seu estilo, no seu tempo. Agende seu corte em segundos.');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -1772,6 +1780,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setLunchEnd(s.lunch_end || '');
         setProfileName(s.profile_name || 'Renan Sandes');
         setProfileImage(s.profile_image || '/renan.png');
+        setCompanyName(s.company_name || 'Garagem Detail');
+        setCompanyTagline(s.company_tagline || 'Seu estilo, no seu tempo. Agende seu corte em segundos.');
       }
     };
     loadSettings();
@@ -1785,13 +1795,21 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       { key: 'lunch_start', value: lunchStart },
       { key: 'lunch_end', value: lunchEnd },
       { key: 'profile_name', value: profileName },
-      { key: 'profile_image', value: profileImage }
+      { key: 'profile_image', value: profileImage },
+      { key: 'company_name', value: companyName },
+      { key: 'company_tagline', value: companyTagline }
     ];
 
     const { error } = await supabase.from('settings').upsert(updates);
 
     if (error) alert('Erro ao salvar: ' + error.message);
-    else alert('Configurações salvas!');
+    else {
+      alert('Configurações salvas!');
+      localStorage.setItem('company_name', companyName);
+      localStorage.setItem('company_tagline', companyTagline);
+      localStorage.setItem('profile_name', profileName);
+      localStorage.setItem('profile_image', profileImage);
+    }
   };
 
   return (
@@ -1801,8 +1819,19 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <h2 className="font-bold text-slate-900 dark:text-white">Configuração</h2>
         <div className="size-10"></div>
       </header>
-      <main className="p-4 space-y-6 max-w-md mx-auto w-full">
-        <div className="bg-white dark:bg-surface-dark p-6 rounded-xl border border-gray-200 dark:border-white/10 space-y-4 transition-colors">
+      <main className="p-4 space-y-6 max-w-md mx-auto w-full pb-24">
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-xl border border-gray-200 dark:border-white/10 space-y-4 transition-colors shadow-sm">
+          <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary">storefront</span> Identidade Visual</h3>
+          <div>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Nome da Empresa</label>
+            <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: Garagem Detail" />
+          </div>
+          <div>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Tagline / Descrição (Landing Page)</label>
+            <textarea value={companyTagline} onChange={e => setCompanyTagline(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" rows={2} placeholder="Ex: Seu estilo, no seu tempo..." />
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 dark:border-white/5"></div>
           <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary">person</span> Perfil do Profissional</h3>
           <div>
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Nome do Profissional</label>
@@ -1847,6 +1876,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       </main>
     </div>
   );
+};
 };
 
 
@@ -3023,7 +3053,7 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchServicesList();
     // Fetch profile info and save to localStorage for cross-screen sync
-    supabase.from('settings').select('*').in('key', ['profile_name', 'profile_image']).then(({ data }) => {
+    supabase.from('settings').select('*').in('key', ['profile_name', 'profile_image', 'company_name', 'company_tagline']).then(({ data }) => {
       if (data) {
         data.forEach((r: any) => localStorage.setItem(r.key, r.value));
       }
