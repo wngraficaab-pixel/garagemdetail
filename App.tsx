@@ -599,7 +599,7 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
             </div>
 
             <button
-              disabled={!quoteData.vehicleColor || !quoteData.vehicleModelYear}
+              disabled={!quoteData.vehicleColor || !quoteData.vehicleModelYear || quoteData.vehiclePhotos.length === 0}
               onClick={() => setStep('POLISHING')}
               className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
             >
