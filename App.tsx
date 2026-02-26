@@ -280,7 +280,7 @@ const IOSNotification: React.FC<{ message: string; visible: boolean; onClose: ()
 const LandingScreen: React.FC<{ onStart: () => void; onAdmin: () => void }> = ({ onStart, onAdmin }) => (
   <div className="relative flex min-h-screen w-full flex-col bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark overflow-hidden transition-colors">
     <div className="relative w-full h-[55vh] min-h-[400px] overflow-hidden rounded-b-[2.5rem]">
-      <div className="absolute inset-0 bg-center bg-cover bg-no-repeat" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAd9ZmeHOyg42x7v0k0qNhO9-cK785skXNL_S6do6DDC5G5lb-B1ftMgparS2gwUG7ooRV9_XnYkvC2WZZ3h6WU51kIeASA39uINq6la0Z2BqcF95tIMTnhUvI53fWECSvsvtVxppcZ1GOwUw6UWFvSqKuLladxkOuS4hVaIXBzMzlgig19A6E7vUZldSxux-DbJw8JvmeWvIeb5TG4wpmT6nQXz1DuxMGJqlWmMR7ZL7TvUrEyVCFEkLV0gpxfI_wLl3Y0FdU2ks-t")' }}></div>
+      <div className="absolute inset-0 bg-center bg-cover bg-no-repeat" style={{ backgroundImage: 'url("/landing-bg.jpg")' }}></div>
       <div className="absolute inset-0 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/60 dark:via-background-dark/60 to-transparent"></div>
       <div className="absolute bottom-0 left-0 w-full p-8 pb-12 flex flex-col items-center justify-end h-full z-10">
         <div className="mb-6 h-16 w-16 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(37,99,235,0.3)]">
