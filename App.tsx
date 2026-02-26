@@ -210,6 +210,23 @@ const getNextDays = (count: number) => {
   return days;
 };
 
+const formatDuration = (totalMins: number) => {
+  if (!totalMins) return '0 min';
+  const days = Math.floor(totalMins / (24 * 60));
+  const hours = Math.floor((totalMins % (24 * 60)) / 60);
+  const mins = totalMins % 60;
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  return parts.join(' ') || '0 min';
+};
+
+const parseDuration = (days: number, hours: number, mins: number) => {
+  return (days * 24 * 60) + (hours * 60) + mins;
+};
+
 
 
 const SuccessOverlay: React.FC = () => (
@@ -480,7 +497,7 @@ const SelectServicesScreen: React.FC<{
                 <p className="text-gray-500 dark:text-gray-400 text-xs line-clamp-2 mt-1">{service.description}</p>
                 <div className="flex justify-between mt-2">
                   <span className="text-primary font-bold text-sm">R$ {service.price.toFixed(2)}</span>
-                  <span className="text-gray-500 text-xs flex items-center gap-1"><span className="material-symbols-outlined text-sm">schedule</span> {service.duration} min</span>
+                  <span className="text-gray-500 text-xs flex items-center gap-1"><span className="material-symbols-outlined text-sm">schedule</span> {formatDuration(service.duration)}</span>
                 </div>
               </div>
               <input
@@ -2822,6 +2839,7 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [services, setServices] = useState<Service[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editingService, setEditingService] = useState<Partial<Service>>({});
+  const [durationParts, setDurationParts] = useState({ days: 0, hours: 0, mins: 0 });
   const [loading, setLoading] = useState(false);
 
   const fetchServices = async () => {
@@ -2843,14 +2861,18 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   useEffect(() => { fetchServices(); }, []);
 
   const handleSave = async () => {
-    if (!editingService.name || !editingService.price) return;
+    const totalMinutes = parseDuration(durationParts.days, durationParts.hours, durationParts.mins);
+    if (!editingService.name || !editingService.price || totalMinutes <= 0) {
+      if (totalMinutes <= 0) alert('A duração deve ser maior que zero');
+      return;
+    }
     setLoading(true);
 
     const payload = {
       name: editingService.name,
       description: editingService.description,
       price: editingService.price,
-      duration: editingService.duration,
+      duration: totalMinutes,
       image_url: editingService.imageUrl,
       is_active: true
     };
@@ -2897,9 +2919,27 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <div className="space-y-4">
           <input className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Nome do Serviço" value={editingService.name || ''} onChange={e => setEditingService({ ...editingService, name: e.target.value })} />
           <textarea className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 h-24 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Descrição" value={editingService.description || ''} onChange={e => setEditingService({ ...editingService, description: e.target.value })} />
-          <div className="flex gap-2">
-            <input type="number" className="flex-1 bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Preço (R$)" value={editingService.price || ''} onChange={e => setEditingService({ ...editingService, price: parseFloat(e.target.value) })} />
-            <input type="number" className="flex-1 bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Duração (min)" value={editingService.duration || ''} onChange={e => setEditingService({ ...editingService, duration: parseInt(e.target.value) })} />
+          <div className="space-y-1">
+            <label className="text-xs text-gray-500 font-bold ml-1">Preço (R$)</label>
+            <input type="number" className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="0.00" value={editingService.price || ''} onChange={e => setEditingService({ ...editingService, price: parseFloat(e.target.value) })} />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-gray-500 font-bold ml-1">Duração do Serviço</label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <input type="number" className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white text-center" placeholder="Dias" value={durationParts.days || ''} onChange={e => setDurationParts({ ...durationParts, days: parseInt(e.target.value) || 0 })} />
+                <span className="text-[10px] text-gray-400 block text-center mt-1">Dias</span>
+              </div>
+              <div className="flex-1">
+                <input type="number" className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white text-center" placeholder="Hrs" value={durationParts.hours || ''} onChange={e => setDurationParts({ ...durationParts, hours: parseInt(e.target.value) || 0 })} />
+                <span className="text-[10px] text-gray-400 block text-center mt-1">Horas</span>
+              </div>
+              <div className="flex-1">
+                <input type="number" className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white text-center" placeholder="Min" value={durationParts.mins || ''} onChange={e => setDurationParts({ ...durationParts, mins: parseInt(e.target.value) || 0 })} />
+                <span className="text-[10px] text-gray-400 block text-center mt-1">Minutos</span>
+              </div>
+            </div>
           </div>
           <input className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="URL da Imagem" value={editingService.imageUrl || ''} onChange={e => setEditingService({ ...editingService, imageUrl: e.target.value })} />
 
@@ -2966,7 +3006,7 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <img src={s.imageUrl} className="size-16 rounded-lg object-cover bg-gray-100 dark:bg-gray-800 pointer-events-none" />
                         <div className="flex-1">
                           <h3 className="font-bold text-slate-900 dark:text-white">{s.name}</h3>
-                          <p className="text-gray-500 dark:text-gray-400 text-xs">R$ {s.price.toFixed(2)} • {s.duration} min</p>
+                          <p className="text-gray-500 dark:text-gray-400 text-xs">R$ {s.price.toFixed(2)} • {formatDuration(s.duration)}</p>
                         </div>
                         <div className="flex flex-col gap-2">
                           <button onClick={() => { setEditingService(s); setIsEditing(true); }} className="size-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-blue-500 dark:text-blue-400 transition-colors"><span className="material-symbols-outlined text-sm">edit</span></button>
