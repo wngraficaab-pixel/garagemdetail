@@ -283,8 +283,7 @@ const LandingScreen: React.FC<{ onStart: () => void; onAdmin: () => void }> = ({
       <div className="absolute inset-0 bg-center bg-cover bg-no-repeat" style={{ backgroundImage: 'url("/landing-bg.jpg")' }}></div>
       <div className="absolute inset-0 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/60 dark:via-background-dark/60 to-transparent"></div>
       <div className="absolute bottom-0 left-0 w-full p-8 pb-12 flex flex-col items-center justify-end h-full z-10">
-        <div className="mb-6 h-16 w-16 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(37,99,235,0.3)]">
-          {/* <span className="material-symbols-outlined text-primary text-[32px]">content_cut</span> */}
+        <div className="mb-6 h-32 w-32 flex items-center justify-center">
           <img src="/logo.png" alt="Logo Garagem Detail" className="h-full w-full object-contain" />
         </div>
         <h1 className="text-slate-900 dark:text-white tracking-tight text-4xl font-extrabold leading-tight text-center mb-3">Garagem Detail</h1>
