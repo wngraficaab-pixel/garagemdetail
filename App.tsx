@@ -345,7 +345,7 @@ const HomeScreen: React.FC<{
       <div className="grid grid-cols-2 gap-3 mb-6">
         <button onClick={onAgendar} className="relative group flex flex-col items-start justify-end p-4 h-40 w-full rounded-2xl overflow-hidden shadow-lg hover:shadow-xl active:scale-[0.98] transition-all">
           <div className="absolute inset-0 z-0">
-            <img alt="Agendamento" className="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbUv_-lMKHndUn4JTalhq50b_lZxMNuTjD0Tq15Kr4PZuSonpCNqY9r-GzE6A4RUVeOl947gmKD38S8XxgRrPpRjzO3nd2RH7EY5ZLdn0RTcUF-geos6tbYAqxaCCkZu4xxwYwIBwJ0cP1L_43YG1lBjMg_FZGjS84dSsAxG06H6DVq7St4chZBRIXF5kOEjFsOJI4m1humE6qwmH69brUzIHQd7YR2aUl3gbIy1r8rOXQq_8gwB_G9C7tLBBjeVNZLM4fAenpibIo" />
+            <img alt="Agendamento" className="h-full w-full object-cover" src="/agendamento_btn.jpg" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
           </div>
           <div className="relative z-10 flex flex-col items-start gap-1">
