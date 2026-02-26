@@ -3390,6 +3390,8 @@ const App: React.FC = () => {
             setView('CUSTOMER_LOGIN');
           }}
           onMais={() => setView('LANDING')}
+          address={localStorage.getItem('company_address') || ""}
+          hours={JSON.parse(localStorage.getItem('business_hours') || "[]")}
         />;
       case 'SELECT_SERVICES':
         return <SelectServicesScreen
