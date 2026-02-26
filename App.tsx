@@ -333,7 +333,7 @@ const HomeScreen: React.FC<{
         </button>
         <button onClick={onChat} className="relative group flex flex-col items-start justify-end p-4 h-40 w-full rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-white/5 active:scale-[0.98] transition-all">
           <div className="absolute inset-0 z-0">
-            <img alt="Barbeiro" className="h-full w-full object-cover" src="/renan.png" />
+            <img alt="Barbeiro" className="h-full w-full object-cover" src={localStorage.getItem('profile_image') || "/renan.png"} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
           </div>
           <div className="relative z-10 flex flex-col items-start gap-1">
@@ -1757,6 +1757,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [interval, setInterval] = useState('30');
   const [lunchStart, setLunchStart] = useState('');
   const [lunchEnd, setLunchEnd] = useState('');
+  const [profileName, setProfileName] = useState('Renan Sandes');
+  const [profileImage, setProfileImage] = useState('/renan.png');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -1769,6 +1771,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setInterval(s.interval_minutes || '30');
         setLunchStart(s.lunch_start || '');
         setLunchEnd(s.lunch_end || '');
+        setProfileName(s.profile_name || 'Renan Sandes');
+        setProfileImage(s.profile_image || '/renan.png');
       }
     };
     loadSettings();
@@ -1780,10 +1784,11 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       { key: 'end_time', value: endTime },
       { key: 'interval_minutes', value: interval },
       { key: 'lunch_start', value: lunchStart },
-      { key: 'lunch_end', value: lunchEnd }
+      { key: 'lunch_end', value: lunchEnd },
+      { key: 'profile_name', value: profileName },
+      { key: 'profile_image', value: profileImage }
     ];
 
-    // Upsert all
     const { error } = await supabase.from('settings').upsert(updates);
 
     if (error) alert('Erro ao salvar: ' + error.message);
@@ -1794,11 +1799,23 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col transition-colors">
       <header className="sticky top-0 z-50 p-4 border-b border-gray-200 dark:border-white/5 bg-white/95 dark:bg-background-dark flex items-center justify-between backdrop-blur-md transition-colors">
         <button onClick={onBack} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">arrow_back</span></button>
-        <h2 className="font-bold text-slate-900 dark:text-white">Configuração da Agenda</h2>
+        <h2 className="font-bold text-slate-900 dark:text-white">Configuração</h2>
         <div className="size-10"></div>
       </header>
       <main className="p-4 space-y-6 max-w-md mx-auto w-full">
         <div className="bg-white dark:bg-surface-dark p-6 rounded-xl border border-gray-200 dark:border-white/10 space-y-4 transition-colors">
+          <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary">person</span> Perfil do Profissional</h3>
+          <div>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Nome do Profissional</label>
+            <input type="text" value={profileName} onChange={e => setProfileName(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: Renan Sandes" />
+          </div>
+          <div>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">URL da Foto</label>
+            <input type="text" value={profileImage} onChange={e => setProfileImage(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: /renan.png ou link externo" />
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 dark:border-white/5"></div>
+          <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary">schedule</span> Configuração da Agenda</h3>
           <div>
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Horário de Abertura</label>
             <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" />
@@ -1826,7 +1843,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Fim do Almoço (Opcional)</label>
             <input type="time" value={lunchEnd} onChange={e => setLunchEnd(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" />
           </div>
-          <button onClick={handleSave} className="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg shadow-primary/20 mt-4">Salvar Configurações</button>
+          <button onClick={handleSave} className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 mt-4 active:scale-[0.98] transition-all">Salvar Alterações</button>
         </div>
       </main>
     </div>
@@ -1880,10 +1897,10 @@ const LoginScreen: React.FC<{ onLogin: () => void; onBack: () => void }> = ({ on
       <div className="flex flex-col items-center mb-10">
         <div className="size-24 rounded-full bg-white dark:bg-surface-dark border-4 border-gray-100 dark:border-white/5 flex items-center justify-center overflow-hidden relative group shadow-lg transition-colors">
           {/* <span className="material-symbols-outlined text-4xl text-gray-500">person</span> */}
-          <img src="/renan.png" className="h-full w-full object-cover" />
+          <img src={localStorage.getItem('profile_image') || "/renan.png"} className="h-full w-full object-cover" />
           <div className="absolute bottom-0 right-0 bg-primary p-1.5 rounded-full border-2 border-white dark:border-background-dark shadow-md"><span className="material-symbols-outlined text-xs text-white">photo_camera</span></div>
         </div>
-        <span className="text-primary text-sm font-bold mt-3">Renan Sandes</span>
+        <span className="text-primary text-sm font-bold mt-3">{localStorage.getItem('profile_name') || "Renan Sandes"}</span>
       </div>
       <div className="space-y-4 mb-10">
         <div className="relative">
@@ -2352,11 +2369,11 @@ const AdminDashboard: React.FC<{
       <header className="sticky top-0 z-50 p-4 border-b border-gray-200 dark:border-white/5 bg-white/90 dark:bg-background-dark/90 flex items-center justify-between backdrop-blur-md transition-colors">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-white/10 overflow-hidden shadow-sm flex items-center justify-center p-1">
-            <img src="/renan.png" alt="Admin" className="h-full w-full object-cover rounded-full" />
+            <img src={localStorage.getItem('profile_image') || "/renan.png"} alt="Admin" className="h-full w-full object-cover rounded-full" />
           </div>
           <div>
             <h2 className="font-bold leading-none text-slate-900 dark:text-white">Agenda</h2>
-            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">Renan Sandes</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">{localStorage.getItem('profile_name') || "Renan Sandes"}</span>
           </div>
         </div>
         <button onClick={onLogout} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-400 transition-colors">
@@ -2459,6 +2476,19 @@ const AdminDashboard: React.FC<{
             <div className="text-left">
               <h3 className="font-bold text-slate-900 dark:text-white">Alertas</h3>
               <p className="text-cyan-500 dark:text-cyan-400 text-[10px] font-bold uppercase tracking-widest">Ativar Push</p>
+            </div>
+          </button>
+
+          <button
+            onClick={onSettings}
+            className="relative group flex flex-col p-4 rounded-3xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 hover:border-primary/30 active:scale-[0.98] transition-all overflow-hidden shadow-lg h-32 justify-between"
+          >
+            <div className="size-10 rounded-xl bg-slate-700 flex items-center justify-center text-white shadow-lg shadow-slate-700/20">
+              <span className="material-symbols-outlined filled">settings</span>
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-slate-900 dark:text-white">Configurações</h3>
+              <p className="text-gray-500 dark:text-white/70 text-[10px] font-bold uppercase tracking-widest">Perfil e App</p>
             </div>
           </button>
 
@@ -2993,6 +3023,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchServicesList();
+    // Fetch profile info and save to localStorage for cross-screen sync
+    supabase.from('settings').select('*').in('key', ['profile_name', 'profile_image']).then(({ data }) => {
+      if (data) {
+        data.forEach((r: any) => localStorage.setItem(r.key, r.value));
+      }
+    });
   }, []);
 
 
