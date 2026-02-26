@@ -1,7 +1,7 @@
 import ReloadPrompt from './src/ReloadPrompt';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { AppView, Service, BookingState, Appointment, ChatMessage } from './types';
+import { AppView, Service, BookingState, Appointment, ChatMessage, ServiceExtra } from './types';
 import { SERVICES } from './constants';
 import { supabase } from './src/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -357,14 +357,14 @@ const HomeScreen: React.FC<{
         </button>
         <button onClick={onChat} className="relative group flex flex-col items-start justify-end p-4 h-40 w-full rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-white/5 active:scale-[0.98] transition-all">
           <div className="absolute inset-0 z-0">
-            <img alt="Barbeiro" className="h-full w-full object-cover" src={localStorage.getItem('profile_image') || "/renan.png"} />
+            <img alt="Gerente" className="h-full w-full object-cover" src={localStorage.getItem('profile_image') || "/renan.png"} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
           </div>
           <div className="relative z-10 flex flex-col items-start gap-1">
             <div className="mb-1 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm">
               <span className="material-symbols-outlined text-[20px]">chat</span>
             </div>
-            <span className="text-left text-sm font-bold leading-tight text-white">Falar com o Barbeiro</span>
+            <span className="text-left text-sm font-bold leading-tight text-white">Falar com o Gerente</span>
           </div>
         </button>
       </div>
@@ -428,13 +428,43 @@ const SelectServicesScreen: React.FC<{
     setBooking(prev => {
       const exists = prev.selectedServices.find(s => s.id === service.id);
       if (exists) {
-        return { ...prev, selectedServices: prev.selectedServices.filter(s => s.id !== service.id) };
+        // Also remove extras for this service
+        const newExtras = { ...prev.selectedExtras };
+        delete newExtras[service.id];
+        return { ...prev, selectedServices: prev.selectedServices.filter(s => s.id !== service.id), selectedExtras: newExtras };
       }
       return { ...prev, selectedServices: [...prev.selectedServices, service] };
     });
   };
 
-  const totalPrice = booking.selectedServices.reduce((sum, s) => sum + s.price, 0);
+  const toggleExtra = (serviceId: string, extra: ServiceExtra) => {
+    setBooking(prev => {
+      const extras = prev.selectedExtras[serviceId] || [];
+      const exists = extras.find(e => e.id === extra.id);
+      if (exists) {
+        return {
+          ...prev,
+          selectedExtras: {
+            ...prev.selectedExtras,
+            [serviceId]: extras.filter(e => e.id !== extra.id)
+          }
+        };
+      }
+      return {
+        ...prev,
+        selectedExtras: {
+          ...prev.selectedExtras,
+          [serviceId]: [...extras, extra]
+        }
+      };
+    });
+  };
+
+  const totalPrice = booking.selectedServices.reduce((sum, s) => {
+    const extras = booking.selectedExtras[s.id] || [];
+    const extrasTotal = extras.reduce((esum, e) => esum + e.price, 0);
+    return sum + s.price + extrasTotal;
+  }, 0);
 
   return (
     <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col transition-colors">
@@ -444,7 +474,7 @@ const SelectServicesScreen: React.FC<{
         </button>
         <h2 className="text-lg font-bold flex-1 text-center pr-10 text-slate-900 dark:text-white">Serviços</h2>
       </header>
-      <main className="flex-1 p-4 pb-32 max-w-md mx-auto w-full">
+      <main className="flex-1 p-4 pb-48 max-w-md mx-auto w-full">
         <div className="mb-6">
           <h1 className="text-3xl font-extrabold mb-2 text-slate-900 dark:text-white">Escolha o Serviço</h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm">Selecione um ou mais serviços para o seu agendamento.</p>
@@ -458,8 +488,6 @@ const SelectServicesScreen: React.FC<{
               const val = e.target.value;
               setBooking(prev => ({ ...prev, customerPhone: val }));
               if (val.length >= 8) {
-                // Debounce lookup could be better, but simple is ok for now
-                // Debounce lookup could be better, but simple is ok for now
                 supabase.from('clients')
                   .select('name')
                   .eq('phone', val)
@@ -482,32 +510,62 @@ const SelectServicesScreen: React.FC<{
           />
         </div>
         <div className="space-y-4">
-          {services.map(service => (
-            <label key={service.id} className={`relative flex gap-4 p-4 rounded-xl bg-white dark:bg-surface-dark border transition-all cursor-pointer ${booking.selectedServices.some(s => s.id === service.id) ? 'border-primary' : 'border-gray-200 dark:border-transparent'} shadow-sm hover:shadow-md`}>
-              <div className="size-20 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-800 shrink-0">
-                <img
-                  src={service.imageUrl}
-                  onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center'); e.currentTarget.parentElement!.innerHTML = '<span class="material-symbols-outlined text-gray-400">image_not_supported</span>'; }}
-                  className="w-full h-full object-cover"
-                  alt={service.name}
-                />
+          {services.map(service => {
+            const isSelected = booking.selectedServices.some(s => s.id === service.id);
+            return (
+              <div key={service.id} className={`flex flex-col rounded-xl bg-white dark:bg-surface-dark border transition-all ${isSelected ? 'border-primary shadow-md' : 'border-gray-200 dark:border-transparent'} overflow-hidden`}>
+                <label className="flex gap-4 p-4 cursor-pointer">
+                  <div className="size-20 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-800 shrink-0">
+                    <img
+                      src={service.imageUrl}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center'); e.currentTarget.parentElement!.innerHTML = '<span class="material-symbols-outlined text-gray-400">image_not_supported</span>'; }}
+                      className="w-full h-full object-cover"
+                      alt={service.name}
+                    />
+                  </div>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">{service.name}</h3>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs line-clamp-2 mt-1">{service.description}</p>
+                    <div className="flex justify-between mt-2">
+                      <span className="text-primary font-bold text-sm">R$ {service.price.toFixed(2)}</span>
+                      <span className="text-gray-500 text-xs flex items-center gap-1"><span className="material-symbols-outlined text-sm">schedule</span> {formatDuration(service.duration)}</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleService(service)}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Extras selection */}
+                {isSelected && service.extras && service.extras.length > 0 && (
+                  <div className="bg-primary/5 dark:bg-white/5 p-4 pt-2 border-t border-primary/10 transition-all animate-in fade-in slide-in-from-top-2 duration-300">
+                    <p className="text-[10px] font-bold text-primary dark:text-white uppercase tracking-wider mb-2">Adicionais Sugeridos</p>
+                    <div className="space-y-2">
+                      {service.extras.map(extra => {
+                        const isExtraSelected = (booking.selectedExtras[service.id] || []).some(e => e.id === extra.id);
+                        return (
+                          <button
+                            key={extra.id}
+                            onClick={() => toggleExtra(service.id, extra)}
+                            className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${isExtraSelected ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/5 text-slate-700 dark:text-gray-300'}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-sm">{isExtraSelected ? 'check_box' : 'check_box_outline_blank'}</span>
+                              <span className="text-xs font-bold">{extra.name}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold ${isExtraSelected ? 'text-white/80' : 'text-primary'}`}>+ R$ {extra.price.toFixed(2)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">{service.name}</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-xs line-clamp-2 mt-1">{service.description}</p>
-                <div className="flex justify-between mt-2">
-                  <span className="text-primary font-bold text-sm">R$ {service.price.toFixed(2)}</span>
-                  <span className="text-gray-500 text-xs flex items-center gap-1"><span className="material-symbols-outlined text-sm">schedule</span> {formatDuration(service.duration)}</span>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={booking.selectedServices.some(s => s.id === service.id)}
-                onChange={() => toggleService(service)}
-                className="hidden"
-              />
-            </label>
-          ))}
+            );
+          })}
         </div>
       </main>
       <footer className="fixed bottom-0 w-full bg-white/95 dark:bg-surface-dark/95 backdrop-blur-lg border-t border-gray-100 dark:border-white/5 p-5 pb-8 transition-colors">
@@ -600,7 +658,11 @@ const SelectDateTimeScreen: React.FC<{
 
     const times: string[] = [];
     const step = 15;
-    const myDuration = booking.selectedServices.reduce((sum, s) => sum + s.duration, 0) || 30;
+    const myDuration = booking.selectedServices.reduce((sum, s) => {
+      const extras = booking.selectedExtras[s.id] || [];
+      const extrasDuration = extras.reduce((eacc, e) => eacc + e.duration, 0);
+      return sum + s.duration + extrasDuration;
+    }, 0) || 30;
 
     const generateSlots = (start: string, end: string) => {
       if (!start || !end) return;
@@ -1200,7 +1262,11 @@ const ReviewScreen: React.FC<{
   onConfirm: () => void;
   onBack: () => void;
 }> = ({ booking, onConfirm, onBack }) => {
-  const totalPrice = booking.selectedServices.reduce((sum, s) => sum + s.price, 0);
+  const totalPrice = booking.selectedServices.reduce((sum, s) => {
+    const extras = booking.selectedExtras[s.id] || [];
+    const extrasTotal = extras.reduce((esum, e) => esum + e.price, 0);
+    return sum + s.price + extrasTotal;
+  }, 0);
   return (
     <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col pb-24 transition-colors">
       <header className="sticky top-0 z-50 flex items-center p-4 bg-white/95 dark:bg-background-dark/95 border-b border-gray-200 dark:border-white/5 transition-colors">
@@ -1233,15 +1299,23 @@ const ReviewScreen: React.FC<{
         <section className="bg-white dark:bg-surface-dark rounded-2xl border border-gray-200 dark:border-white/5 p-5 shadow-sm transition-colors">
           <h3 className="text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-wider text-slate-900 dark:text-white"><span className="material-symbols-outlined text-primary text-xl">receipt_long</span> Resumo</h3>
           <div className="space-y-4">
-            {booking.selectedServices.map(s => (
-              <div key={s.id} className="flex justify-between text-sm text-slate-900 dark:text-white">
-                <div>
-                  <p className="font-bold">{s.name}</p>
-                  <span className="text-xs text-gray-500">{s.duration} min</span>
+            {booking.selectedServices.map(s => {
+              const extras = booking.selectedExtras[s.id] || [];
+              return (
+                <div key={s.id} className="space-y-1">
+                  <div className="flex justify-between text-sm text-slate-900 dark:text-white font-bold">
+                    <span>{s.name}</span>
+                    <span>R$ {s.price.toFixed(2)}</span>
+                  </div>
+                  {extras.map(e => (
+                    <div key={e.id} className="flex justify-between text-[11px] text-gray-500 italic pl-4">
+                      <span>+ {e.name}</span>
+                      <span>R$ {e.price.toFixed(2)}</span>
+                    </div>
+                  ))}
                 </div>
-                <p className="font-bold">R$ {s.price.toFixed(2)}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="my-5 border-t border-gray-200 dark:border-white/10 border-dashed"></div>
           <div className="flex justify-between items-center">
@@ -1504,7 +1578,7 @@ const ChatScreen: React.FC<{
         <div className="text-center mb-8">
           <div className="size-20 bg-primary/20 text-primary rounded-full flex items-center justify-center mx-auto mb-4 border border-primary/20"><span className="material-symbols-outlined text-4xl filled">chat</span></div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Quase lá!</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Para falar com o barbeiro, precisamos saber quem é você.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Para falar com o gerente, precisamos saber quem é você.</p>
         </div>
         <div className="space-y-4">
           <input value={tempName} onChange={e => setTempName(e.target.value)} className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Seu Nome" />
@@ -2035,7 +2109,10 @@ const AdminCalendarView: React.FC<{
     const selectedDateStart = new Date(`${selectedDateStr}T00:00:00`).getTime();
     const selectedDateEnd = selectedDateStart + (24 * 60 * 60000);
 
-    const totalDuration = app.services.reduce((sum, s) => sum + s.duration, 0) || 30;
+    const allExtras = Object.values(app.selectedExtras || {}).flat() as any[];
+    const baseDuration = app.services.reduce((sum, s) => sum + s.duration, 0);
+    const extrasDuration = allExtras.reduce((sum: number, e: any) => sum + e.duration, 0) as number;
+    const totalDuration = (baseDuration + extrasDuration) || 30;
     const appStart = new Date(`${app.date}T${app.time}:00`).getTime();
     const appEnd = appStart + (totalDuration * 60000);
 
@@ -2112,7 +2189,10 @@ const AdminCalendarView: React.FC<{
           {/* Events Area */}
           <div className="flex-1 relative bg-white dark:bg-surface-dark bg-[linear-gradient(to_bottom,transparent_119px,rgba(0,0,0,0.05)_120px)] dark:bg-[linear-gradient(to_bottom,transparent_119px,rgba(255,255,255,0.05)_120px)] bg-[size:100%_120px]">
             {dayApps.map(app => {
-              const totalDuration = app.services.reduce((sum, s) => sum + s.duration, 0) || 30;
+              const allExtras = Object.values(app.selectedExtras || {}).flat() as any[];
+              const baseDuration = app.services.reduce((sum, s) => sum + s.duration, 0);
+              const extrasDuration = allExtras.reduce((sum: number, e: any) => sum + e.duration, 0) as number;
+              const totalDuration = (baseDuration + extrasDuration) || 30;
               const pos = getPosition(app.date, app.time, totalDuration);
               if (!pos) return null;
 
@@ -2137,6 +2217,11 @@ const AdminCalendarView: React.FC<{
                   </div>
                   <div className="text-[10px] opacity-90 truncate mt-0.5">
                     {app.services.map(s => s.name).join(', ')}
+                    {Object.values(app.selectedExtras || {}).flat().length > 0 && (
+                      <span className="font-bold">
+                        {" + "}{Object.values(app.selectedExtras || {}).flat().map((e: any) => e.name).join(' + ')}
+                      </span>
+                    )}
                     {pos.isContinuesNext && ' ...'}
                   </div>
                 </div>
@@ -2285,8 +2370,11 @@ const AdminTVScreen: React.FC<{ appointments: Appointment[]; onBack: () => void;
                 const appTimeParts = app.time.split(':');
                 const start = new Date(currentTime);
                 start.setHours(parseInt(appTimeParts[0]), parseInt(appTimeParts[1]), 0, 0);
-                const duration = app.services.reduce((acc, s) => acc + s.duration, 0);
-                const end = addMinutes(start, duration);
+                const allExtras = Object.values(app.selectedExtras || {}).flat() as any[];
+                const baseDuration = app.services.reduce((acc, s) => acc + s.duration, 0);
+                const extrasDuration = allExtras.reduce((acc: number, s: any) => acc + (s.duration || 0), 0) as number;
+                const totalDuration = baseDuration + extrasDuration;
+                const end = addMinutes(start, totalDuration);
                 const isNow = currentTime >= start && currentTime < end;
 
                 return (
@@ -2312,12 +2400,18 @@ const AdminTVScreen: React.FC<{ appointments: Appointment[]; onBack: () => void;
                             {s.name}
                           </span>
                         ))}
+                        {Object.values(app.selectedExtras || {}).flat().map((e: any) => (
+                          <span key={e.id} className={`${isNow ? 'bg-orange-600 text-white shadow-orange-600/40' : 'bg-orange-500 text-white shadow-orange-500/20'} px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm`}>
+                            + {e.name}
+                          </span>
+                        ))}
                         {app.services.length > 2 && <span className="text-[10px] opacity-70">+{app.services.length - 2}</span>}
                       </div>
                       <div className="flex justify-between items-center bg-black/20 p-2 rounded-lg">
                         <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1 ${isNow ? 'text-yellow-200' : 'text-gray-400'}`}>
                           <span className="material-symbols-outlined text-sm">schedule</span>
-                          {duration} min
+                          {formatDuration(baseDuration)}
+                          {extrasDuration > 0 && <span className="text-orange-400 font-black"> + {formatDuration(extrasDuration)}</span>}
                         </span>
                         <span className="text-lg font-black text-green-400">R$ {app.totalPrice.toFixed(2)}</span>
                       </div>
@@ -2751,7 +2845,18 @@ const AdminDashboard: React.FC<{
                             {app.time}
                           </span>
                           <span className="text-gray-500 text-[10px] font-bold uppercase mt-0.5">
-                            {app.services.reduce((total, s) => total + s.duration, 0)} min de duração
+                            {(() => {
+                              const baseDuration = app.services.reduce((total, s) => total + s.duration, 0);
+                              const allExtras = Object.values(app.selectedExtras || {}).flat();
+                              const extrasDuration = (allExtras as any[]).reduce((total: number, e: any) => total + (e.duration || 0), 0);
+                              return (
+                                <>
+                                  {formatDuration(baseDuration)}
+                                  {extrasDuration > 0 && <span className="text-primary ml-1">+ {formatDuration(extrasDuration)}</span>}
+                                  {" "}de duração
+                                </>
+                              );
+                            })()}
                           </span>
                         </div>
                         <span className="bg-green-500/15 text-green-600 dark:text-green-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-green-500/20">
@@ -2766,6 +2871,14 @@ const AdminDashboard: React.FC<{
                           <h4 className="font-bold text-base text-slate-900 dark:text-white truncate">{app.customerName}</h4>
                           <p className="text-xs text-gray-500 font-medium truncate opacity-80">
                             {app.services.map(s => s.name).join(' + ')}
+                            {(() => {
+                              const extras = Object.values(app.selectedExtras || {}).flat();
+                              return extras.length > 0 && (
+                                <span className="text-primary font-bold">
+                                  {" + "}{extras.map((e: any) => e.name).join(' + ')}
+                                </span>
+                              );
+                            })()}
                           </p>
                         </div>
 
@@ -2850,7 +2963,17 @@ Dúvidas, responder a essa mensagem!`)}`}
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 dark:text-white strike-through decoration-slate-900/30">{app.customerName}</p>
-                          <p className="text-xs text-gray-500">{app.services.map(s => s.name).join(', ')}</p>
+                          <p className="text-xs text-gray-500">
+                            {app.services.map(s => s.name).join(', ')}
+                            {(() => {
+                              const extras = Object.values(app.selectedExtras || {}).flat();
+                              return extras.length > 0 && (
+                                <span className="text-primary font-bold">
+                                  {" + "}{extras.map((e: any) => e.name).join(', ')}
+                                </span>
+                              );
+                            })()}
+                          </p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -2881,22 +3004,62 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
 
   const fetchServices = async () => {
-    const { data, error } = await supabase
+    const { data: servicesData, error } = await supabase
       .from('services')
       .select('*')
       .eq('is_active', true)
       .order('display_order', { ascending: true });
 
+    const { data: extrasData } = await supabase.from('service_extras').select('*');
+
     if (error) console.error(error);
-    else if (data) {
-      setServices(data.map((s: any) => ({
+    else if (servicesData) {
+      setServices(servicesData.map((s: any) => ({
         ...s,
-        imageUrl: s.image_url
+        id: String(s.id),
+        imageUrl: s.image_url,
+        extras: extrasData?.filter((e: any) => String(e.service_id) === String(s.id)) || []
       })));
     }
   };
 
   useEffect(() => { fetchServices(); }, []);
+
+  const [newExtra, setNewExtra] = useState({ name: '', price: 0, duration: 0 });
+
+  const handleAddExtra = async (serviceId: string) => {
+    if (!newExtra.name) return;
+    const { data, error } = await supabase.from('service_extras').insert({
+      service_id: serviceId,
+      name: newExtra.name,
+      price: newExtra.price,
+      duration: newExtra.duration
+    }).select().single();
+
+    if (error) {
+      alert('Erro ao adicionar adicional');
+    } else if (data) {
+      setEditingService(prev => ({
+        ...prev,
+        extras: [...(prev.extras || []), data]
+      }));
+      setNewExtra({ name: '', price: 0, duration: 0 });
+      fetchServices();
+    }
+  };
+
+  const handleDeleteExtra = async (extraId: string) => {
+    const { error } = await supabase.from('service_extras').delete().eq('id', extraId);
+    if (error) {
+      alert('Erro ao excluir adicional');
+    } else {
+      setEditingService(prev => ({
+        ...prev,
+        extras: prev.extras?.filter(e => e.id !== extraId) || []
+      }));
+      fetchServices();
+    }
+  };
 
   const handleSave = async () => {
     const totalMinutes = parseDuration(durationParts.days, durationParts.hours, durationParts.mins);
@@ -2916,17 +3079,24 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
 
     let error;
+    let savedService;
     if (editingService.id) {
-      const { error: err } = await supabase
+      const { data, error: err } = await supabase
         .from('services')
         .update(payload)
-        .eq('id', editingService.id);
+        .eq('id', editingService.id)
+        .select()
+        .single();
       error = err;
+      savedService = data;
     } else {
-      const { error: err } = await supabase
+      const { data, error: err } = await supabase
         .from('services')
-        .insert(payload);
+        .insert(payload)
+        .select()
+        .single();
       error = err;
+      savedService = data;
     }
 
     setLoading(false);
@@ -2934,8 +3104,13 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       console.error(error);
       alert('Erro ao salvar serviço');
     } else {
-      setIsEditing(false);
-      setEditingService({});
+      // If it was a new service, we stay in edit mode but with the ID now
+      if (!editingService.id && savedService) {
+        setEditingService({ ...editingService, id: savedService.id, extras: [] });
+      } else {
+        setIsEditing(false);
+        setEditingService({});
+      }
       fetchServices();
     }
   };
@@ -2981,9 +3156,81 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </div>
           <input className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="URL da Imagem" value={editingService.imageUrl || ''} onChange={e => setEditingService({ ...editingService, imageUrl: e.target.value })} />
 
-          <button onClick={handleSave} disabled={loading} className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20">
-            {loading ? 'Salvando...' : 'Salvar Serviço'}
-          </button>
+          {/* Service Extras Section */}
+          {editingService.id && (
+            <div className="mt-8 border-t border-gray-100 dark:border-white/5 pt-6">
+              <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">add_circle</span>
+                Adicionais deste Serviço
+              </h3>
+
+              <div className="space-y-3 mb-6">
+                {editingService.extras?.map(extra => (
+                  <div key={extra.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">{extra.name}</p>
+                      <p className="text-[10px] text-gray-500">R$ {extra.price.toFixed(2)} • {formatDuration(extra.duration)}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteExtra(extra.id)}
+                      className="size-8 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-500/10 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                  </div>
+                ))}
+                {(!editingService.extras || editingService.extras.length === 0) && (
+                  <p className="text-xs text-gray-400 italic text-center py-2">Nenhum adicional cadastrado.</p>
+                )}
+              </div>
+
+              {/* Add New Extra Form */}
+              <div className="bg-primary/5 dark:bg-white/5 p-4 rounded-2xl border border-primary/10 space-y-3">
+                <p className="text-xs font-bold text-primary dark:text-primary-dark ml-1">Adicionar novo extra</p>
+                <input
+                  className="w-full bg-white dark:bg-surface-dark p-2.5 rounded-lg border border-gray-200 dark:border-white/10 text-sm"
+                  placeholder="Nome do Adicional"
+                  value={newExtra.name}
+                  onChange={e => setNewExtra({ ...newExtra, name: e.target.value })}
+                />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      className="w-full bg-white dark:bg-surface-dark p-2.5 rounded-lg border border-gray-200 dark:border-white/10 text-sm text-center"
+                      placeholder="Preço R$"
+                      value={newExtra.price || ''}
+                      onChange={e => setNewExtra({ ...newExtra, price: parseFloat(e.target.value) || 0 })}
+                    />
+                    <span className="text-[10px] text-gray-400 block text-center mt-1">Preço Extra</span>
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      className="w-full bg-white dark:bg-surface-dark p-2.5 rounded-lg border border-gray-200 dark:border-white/10 text-sm text-center"
+                      placeholder="Min"
+                      value={newExtra.duration || ''}
+                      onChange={e => setNewExtra({ ...newExtra, duration: parseInt(e.target.value) || 0 })}
+                    />
+                    <span className="text-[10px] text-gray-400 block text-center mt-1">Tempo</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleAddExtra(editingService.id!)}
+                  disabled={!newExtra.name}
+                  className="w-full bg-primary text-white py-2.5 rounded-xl text-sm font-bold shadow-md disabled:opacity-50"
+                >
+                  Confirmar Adicional
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-6 border-t border-gray-100 dark:border-white/5">
+            <button onClick={handleSave} disabled={loading} className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20">
+              {loading ? 'Salvando...' : 'Salvar Serviço'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -3141,12 +3388,15 @@ const App: React.FC = () => {
 
   /* Refactored fetchServicesList to be reused */
   const fetchServicesList = async () => {
-    const { data } = await supabase.from('services').select('*').eq('is_active', true).order('display_order', { ascending: true });
-    if (data) {
-      setServices(data.map((s: any) => ({
+    const { data: servicesData } = await supabase.from('services').select('*').eq('is_active', true).order('display_order', { ascending: true });
+    const { data: extrasData } = await supabase.from('service_extras').select('*');
+
+    if (servicesData) {
+      setServices(servicesData.map((s: any) => ({
         ...s,
         id: String(s.id),
-        imageUrl: s.image_url
+        imageUrl: s.image_url,
+        extras: extrasData?.filter((e: any) => String(e.service_id) === String(s.id)) || []
       })));
     }
   };
@@ -3198,6 +3448,7 @@ const App: React.FC = () => {
     customerName: '',
     customerPhone: '',
     selectedServices: [],
+    selectedExtras: {},
     selectedDate: '',
     selectedTime: '',
   });
@@ -3282,8 +3533,9 @@ const App: React.FC = () => {
       .select(`
                   *,
                   services:appointment_services(
-                  service:services(*)
+                    service:services(*)
                   ),
+                  extras:appointment_extras(*),
                   clients(name, phone)
                   `)
       .order('appointment_date', { ascending: true })
@@ -3316,7 +3568,13 @@ const App: React.FC = () => {
         services: a.services.map((s: any) => ({
           ...s.service,
           imageUrl: s.service.image_url
-        }))
+        })),
+        selectedExtras: (a.extras || []).reduce((acc: any, e: any) => {
+          const sId = String(e.service_id);
+          if (!acc[sId]) acc[sId] = [];
+          acc[sId].push(e);
+          return acc;
+        }, {})
       }));
 
       if (currentUserRole === 'CUSTOMER' && booking.customerPhone) {
@@ -3437,11 +3695,17 @@ const App: React.FC = () => {
     }
 
     // 2. Create Appointment
+    const totalPrice = booking.selectedServices.reduce((sum, s) => {
+      const extras = booking.selectedExtras[s.id] || [];
+      const extrasTotal = extras.reduce((esum, e) => esum + e.price, 0);
+      return sum + s.price + extrasTotal;
+    }, 0);
+
     const { data: appData, error: appError } = await supabase.from('appointments').insert({
       client_id: clientId,
       appointment_date: booking.selectedDate,
       appointment_time: booking.selectedTime,
-      total_price: booking.selectedServices.reduce((sum, s) => sum + s.price, 0),
+      total_price: totalPrice,
       status: 'PENDING'
     }).select().single();
 
@@ -3455,11 +3719,29 @@ const App: React.FC = () => {
     }));
     await supabase.from('appointment_services').insert(serviceInserts);
 
+    // 4. Insert Extras
+    const extraInserts: any[] = [];
+    Object.entries(booking.selectedExtras).forEach(([serviceId, extras]) => {
+      (extras as ServiceExtra[]).forEach(extra => {
+        extraInserts.push({
+          appointment_id: appData.id,
+          extra_id: extra.id,
+          name: extra.name,
+          price: extra.price,
+          duration: extra.duration
+        });
+      });
+    });
+    if (extraInserts.length > 0) {
+      await supabase.from('appointment_extras').insert(extraInserts);
+    }
+
     // Success
     setShowSuccess(true);
     setBooking(prev => ({
       ...prev,
       selectedServices: [],
+      selectedExtras: {},
       selectedDate: '',
       selectedTime: '',
     }));

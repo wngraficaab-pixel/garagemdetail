@@ -23,6 +23,14 @@ export interface BlockedSlot {
   reason: string;
 }
 
+export interface ServiceExtra {
+  id: string;
+  service_id: string;
+  name: string;
+  price: number;
+  duration: number;
+}
+
 export interface Service {
   id: string;
   name: string;
@@ -31,6 +39,7 @@ export interface Service {
   duration: number;
   imageUrl: string;
   popular?: boolean;
+  extras?: ServiceExtra[];
 }
 
 export interface Appointment {
@@ -38,6 +47,7 @@ export interface Appointment {
   customerName: string;
   customerPhone: string;
   services: Service[];
+  selectedExtras?: { [serviceId: string]: ServiceExtra[] };
   date: string; // ISO string or simple YYYY-MM-DD
   time: string; // HH:mm
   totalPrice: number;
@@ -48,6 +58,7 @@ export interface BookingState {
   customerName: string;
   customerPhone: string;
   selectedServices: Service[];
+  selectedExtras: { [serviceId: string]: ServiceExtra[] };
   selectedDate: string;
   selectedTime: string;
 }
