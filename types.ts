@@ -14,7 +14,29 @@ export type AppView =
   | 'ADMIN_BLOCK_SCHEDULE'
   | 'ADMIN_SETTINGS'
   | 'ADMIN_FINANCE'
-  | 'ADMIN_TV';
+  | 'ADMIN_TV'
+  | 'ADMIN_QUOTES'
+  | 'ADMIN_CLIENTS'
+  | 'ADMIN_WEEKLY_SCHEDULE'
+  | 'CUSTOMER_LOGIN'
+  | 'CUSTOM_QUOTE';
+
+export interface Quote {
+  id: string;
+  client_id: string;
+  vehicle_color: string;
+  vehicle_model_year: string;
+  vehicle_photos: string[];
+  polishing_type: 'COMERCIAL' | 'TECNICO' | 'MAQUIAGEM' | '';
+  upholstery_options: string[];
+  upholstery_photos: string[];
+  status: 'PENDING' | 'REPLIED' | 'COMPLETED';
+  created_at: string;
+  client?: {
+    name: string;
+    phone: string;
+  };
+}
 
 export interface BlockedSlot {
   id: string;

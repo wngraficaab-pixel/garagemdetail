@@ -1,7 +1,7 @@
 import ReloadPrompt from './src/ReloadPrompt';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { AppView, Service, BookingState, Appointment, ChatMessage, ServiceExtra } from './types';
+import { AppView, Service, BookingState, Appointment, ChatMessage, ServiceExtra, Quote } from './types';
 import { SERVICES } from './constants';
 import { supabase } from './src/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -325,12 +325,13 @@ const LandingScreen: React.FC<{ onStart: () => void; onAdmin: () => void }> = ({
 
 const HomeScreen: React.FC<{
   onAgendar: () => void;
+  onQuote: () => void;
   onChat: () => void;
   onPerfil: () => void;
   onMais: () => void;
   address: string;
   hours: string[];
-}> = ({ onAgendar, onChat, onPerfil, onMais, address, hours }) => (
+}> = ({ onAgendar, onQuote, onChat, onPerfil, onMais, address, hours }) => (
   <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden pb-24 bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark transition-colors">
     <header className="sticky top-0 z-50 flex items-center justify-center bg-white/95 dark:bg-background-dark/95 backdrop-blur-md px-4 py-3 border-b border-gray-200 dark:border-white/5 gap-2 transition-colors">
       <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
@@ -368,6 +369,15 @@ const HomeScreen: React.FC<{
           </div>
         </button>
       </div>
+      <button onClick={onQuote} className="w-full flex items-center justify-between p-4 bg-orange-500 rounded-2xl shadow-lg border border-white/10 active:scale-[0.98] transition-all mb-6">
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-full bg-white/20 flex items-center justify-center text-white">
+            <span className="material-symbols-outlined">description</span>
+          </div>
+          <span className="text-white font-bold">Fazer orçamento personalizado</span>
+        </div>
+        <span className="material-symbols-outlined text-white">chevron_right</span>
+      </button>
       <div className="flex flex-col flex-1 items-start gap-4 text-slate-800 dark:text-white px-2">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
@@ -416,6 +426,315 @@ const HomeScreen: React.FC<{
     </nav>
   </div>
 );
+
+const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispatch<React.SetStateAction<BookingState>>; customerPhone: string; customerName: string }> = ({ onBack, setBooking, customerPhone, customerName }) => {
+  const [step, setStep] = useState<'IDENTIFY' | 'VEHICLE' | 'POLISHING' | 'UPHOLSTERY' | 'SUCCESS'>(customerPhone ? 'VEHICLE' : 'IDENTIFY');
+  const [loading, setLoading] = useState(false);
+  const [tempIdentify, setTempIdentify] = useState({ name: customerName, phone: customerPhone });
+  const [quoteData, setQuoteData] = useState({
+    vehicleColor: '',
+    vehicleModelYear: '',
+    vehiclePhotos: [] as string[],
+    polishingType: '' as 'COMERCIAL' | 'TECNICO' | 'MAQUIAGEM' | '',
+    upholsteryOptions: [] as string[],
+    upholsteryPhotos: [] as string[]
+  });
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'vehiclePhotos' | 'upholsteryPhotos') => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setQuoteData(prev => ({
+          ...prev,
+          [field]: [...prev[field], reader.result as string]
+        }));
+      };
+      reader.readAsDataURL(file as Blob);
+    });
+  };
+
+  const removePhoto = (index: number, field: 'vehiclePhotos' | 'upholsteryPhotos') => {
+    setQuoteData(prev => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      // Find or create client
+      let clientId: number | undefined;
+      const { data: clientData } = await supabase.from('clients').select('id').eq('phone', customerPhone).single();
+      if (clientData) {
+        clientId = clientData.id;
+      } else {
+        const { data: newClient, error: clientError } = await supabase.from('clients').insert({ name: customerName || 'Cliente Orçamento', phone: customerPhone }).select().single();
+        if (clientError || !newClient) throw new Error('Erro ao salvar cliente');
+        clientId = newClient.id;
+      }
+
+      const { error } = await supabase.from('quotes').insert({
+        client_id: clientId,
+        vehicle_color: quoteData.vehicleColor,
+        vehicle_model_year: quoteData.vehicleModelYear,
+        vehicle_photos: quoteData.vehiclePhotos,
+        polishing_type: quoteData.polishingType,
+        upholstery_options: quoteData.upholsteryOptions,
+        upholstery_photos: quoteData.upholsteryPhotos,
+        status: 'PENDING'
+      });
+
+      if (error) throw error;
+      setStep('SUCCESS');
+    } catch (err: any) {
+      alert('Erro ao enviar orçamento: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (step === 'SUCCESS') {
+    return (
+      <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col p-6 items-center justify-center text-center">
+        <div className="size-20 bg-green-100 dark:bg-green-500/20 rounded-full flex items-center justify-center mb-6 text-green-600">
+          <span className="material-symbols-outlined text-4xl">check_circle</span>
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Solicitação Enviada!</h2>
+        <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs">Seu orçamento foi recebido. Entraremos em contato em breve para confirmar os detalhes.</p>
+        <button onClick={onBack} className="w-full bg-primary text-white py-4 rounded-xl font-bold">Voltar para Início</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col transition-colors relative">
+      <header className="sticky top-0 z-50 p-4 border-b border-gray-200 dark:border-white/5 bg-white/95 dark:bg-background-dark/95 flex items-center justify-between backdrop-blur-md transition-colors">
+        <button onClick={onBack} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">arrow_back</span></button>
+        <h2 className="font-bold text-slate-900 dark:text-white">Orçamento Personalizado</h2>
+        <div className="size-10"></div>
+      </header>
+
+      <main className="flex-1 p-6 space-y-8 max-w-md mx-auto w-full pb-24">
+        {step === 'IDENTIFY' && (
+          <div className="space-y-6 animate-enter">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Identificação</h3>
+              <p className="text-sm text-gray-500 text-center mb-6">Como podemos te chamar e qual seu WhatsApp?</p>
+            </div>
+            <div className="space-y-4">
+              <input
+                placeholder="Seu Nome Completo"
+                className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white"
+                value={tempIdentify.name}
+                onChange={e => setTempIdentify({ ...tempIdentify, name: e.target.value })}
+              />
+              <input
+                placeholder="Seu WhatsApp"
+                className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white"
+                value={tempIdentify.phone}
+                onChange={e => setTempIdentify({ ...tempIdentify, phone: e.target.value })}
+              />
+            </div>
+            <button
+              disabled={!tempIdentify.name || tempIdentify.phone.length < 9}
+              onClick={() => {
+                setBooking(prev => ({ ...prev, customerName: tempIdentify.name, customerPhone: tempIdentify.phone }));
+                setStep('VEHICLE');
+              }}
+              className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
+            >
+              Continuar Orçamento
+            </button>
+          </div>
+        )}
+
+        {step === 'VEHICLE' && (
+          <div className="space-y-6 animate-enter">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Informações do Veículo</h3>
+              <p className="text-sm text-gray-500 text-center mb-6">Conte-nos um pouco sobre sua máquina.</p>
+            </div>
+
+            <div className="space-y-4">
+              <input
+                placeholder="Qual a cor do carro?"
+                className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white"
+                value={quoteData.vehicleColor}
+                onChange={e => setQuoteData({ ...quoteData, vehicleColor: e.target.value })}
+              />
+              <input
+                placeholder="Modelo e ano?"
+                className="w-full bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 rounded-xl p-4 text-slate-900 dark:text-white"
+                value={quoteData.vehicleModelYear}
+                onChange={e => setQuoteData({ ...quoteData, vehicleModelYear: e.target.value })}
+              />
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-500/20">
+              <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                <span className="font-bold">Aviso:</span> O valor exato só pode ser confirmado após a inspeção presencial do profissional.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-slate-700 dark:text-gray-300">Fotos do Veículo (Frente, Trás, Lados, Teto)</p>
+              <div className="grid grid-cols-4 gap-2">
+                {quoteData.vehiclePhotos.map((p, i) => (
+                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
+                    <img src={p} className="w-full h-full object-cover" />
+                    <button onClick={() => removePhoto(i, 'vehiclePhotos')} className="absolute top-1 right-1 size-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="material-symbols-outlined text-[10px]">close</span>
+                    </button>
+                  </div>
+                ))}
+                <label className="aspect-square border-2 border-dashed border-gray-300 dark:border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'vehiclePhotos')} />
+                  <span className="material-symbols-outlined text-gray-400">add_a_photo</span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              disabled={!quoteData.vehicleColor || !quoteData.vehicleModelYear}
+              onClick={() => setStep('POLISHING')}
+              className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
+            >
+              Próximo: Polimento
+            </button>
+          </div>
+        )}
+
+        {step === 'POLISHING' && (
+          <div className="space-y-6 animate-enter">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Tipo de Polimento</h3>
+              <p className="text-sm text-gray-500 text-center mb-6">Escolha o nível de proteção e brilho para sua pintura.</p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                {
+                  id: 'COMERCIAL',
+                  title: 'Comercial',
+                  desc: 'Utilizando uma etapa esse polimento abre o brilho da pintura, elimina arranhões superficiais e mascara os mais profundos após isso é aplicado um selante cerâmico com proteção de até 7 meses.'
+                },
+                {
+                  id: 'TECNICO',
+                  title: 'Polimento Técnico',
+                  desc: 'Com várias etapas eliminamos o máximo de arranhões possíveis de acordo com a espessura do verniz, trazendo assim um brilho extremo a pintura, após o polimento a pintura é vitrificada (Coating Nano-Cerâmico a base de SIO2) para proteger e promover muito mais brilho e hidrorepelência com duração de até 3 anos.'
+                },
+                {
+                  id: 'MAQUIAGEM',
+                  title: 'Maquiagem Automotiva',
+                  desc: 'Cera de alta tecnologia e performance aplicada na pintura que promove brilho intenso e máscara a maior parte dos defeitos, com proteção contra o tempo e hidrorepelência que duram até 4 meses.'
+                }
+              ].map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setQuoteData({ ...quoteData, polishingType: p.id as any })}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${quoteData.polishingType === p.id ? 'bg-primary/10 border-primary ring-1 ring-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className={`font-bold ${quoteData.polishingType === p.id ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{p.title}</span>
+                    {quoteData.polishingType === p.id && <span className="material-symbols-outlined text-primary text-sm">check_circle</span>}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">{p.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep('VEHICLE')} className="flex-1 py-4 text-gray-500 font-bold">Voltar</button>
+              <button
+                disabled={!quoteData.polishingType}
+                onClick={() => setStep('UPHOLSTERY')}
+                className="flex-[2] bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
+              >
+                Próximo: Higienização
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'UPHOLSTERY' && (
+          <div className="space-y-6 animate-enter">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 text-center">Higienização de Estofados</h3>
+              <p className="text-sm text-gray-500 text-center mb-2">Selecione o que deseja incluir.</p>
+              <p className="text-[11px] text-gray-400 text-center leading-relaxed max-w-[280px] mx-auto italic">
+                Limpeza feita pelo processo VSC, extrai completamente a sujeira do tecido, mata todo tipo de fungos e bactérias e previne uma futura proliferação dos mesmo.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {['BANCOS', 'CARPETE', 'TETO'].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    const exists = quoteData.upholsteryOptions.includes(opt);
+                    setQuoteData({
+                      ...quoteData,
+                      upholsteryOptions: exists
+                        ? quoteData.upholsteryOptions.filter(o => o !== opt)
+                        : [...quoteData.upholsteryOptions, opt]
+                    });
+                  }}
+                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${quoteData.upholsteryOptions.includes(opt) ? 'bg-primary/10 border-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
+                >
+                  <span className={`font-bold text-sm ${quoteData.upholsteryOptions.includes(opt) ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{opt}</span>
+                  <span className={`material-symbols-outlined ${quoteData.upholsteryOptions.includes(opt) ? 'text-primary' : 'text-gray-300'}`}>
+                    {quoteData.upholsteryOptions.includes(opt) ? 'check_box' : 'check_box_outline_blank'}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-slate-700 dark:text-gray-300">Fotos do Estado (Manchas, sujeira, etc.)</p>
+              <div className="grid grid-cols-4 gap-2">
+                {quoteData.upholsteryPhotos.map((p, i) => (
+                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
+                    <img src={p} className="w-full h-full object-cover" />
+                    <button onClick={() => removePhoto(i, 'upholsteryPhotos')} className="absolute top-1 right-1 size-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="material-symbols-outlined text-[10px]">close</span>
+                    </button>
+                  </div>
+                ))}
+                <label className="aspect-square border-2 border-dashed border-gray-300 dark:border-white/10 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'upholsteryPhotos')} />
+                  <span className="material-symbols-outlined text-gray-400">add_a_photo</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-200 dark:border-white/5">
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed italic">
+                O serviço é entregue com o detalhamento e hidratação interna e limpeza simples na parte externa.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep('POLISHING')} className="flex-1 py-4 text-gray-500 font-bold">Voltar</button>
+              <button
+                disabled={loading}
+                onClick={handleSubmit}
+                className="flex-[2] bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center"
+              >
+                {loading ? (
+                  <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : 'Solicitar Orçamento'}
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
 
 const SelectServicesScreen: React.FC<{
   booking: BookingState;
@@ -2457,6 +2776,234 @@ const AdminTVScreen: React.FC<{ appointments: Appointment[]; onBack: () => void;
   );
 };
 
+const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+
+  const fetchQuotes = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('*, client:clients(name, phone)')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setQuotes(data);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
+  const handleUpdateStatus = async (quoteId: string, status: string) => {
+    const { error } = await supabase.from('quotes').update({ status }).eq('id', quoteId);
+    if (!error) {
+      setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: status as any } : q));
+      if (selectedQuote?.id === quoteId) {
+        setSelectedQuote(prev => prev ? { ...prev, status: status as any } : null);
+      }
+    }
+  };
+
+  const handleWhatsApp = (phone: string, text: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  return (
+    <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col transition-colors">
+      <header className="sticky top-0 z-50 p-4 border-b border-gray-200 dark:border-white/5 bg-white/95 dark:bg-background-dark/95 flex items-center justify-between backdrop-blur-md transition-colors">
+        <button onClick={onBack} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">arrow_back</span></button>
+        <h2 className="font-bold text-slate-900 dark:text-white">Orçamentos Recebidos</h2>
+        <button onClick={fetchQuotes} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400"><span className="material-symbols-outlined">refresh</span></button>
+      </header>
+
+      <main className="p-4 space-y-4 max-w-4xl mx-auto w-full pb-24">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center p-20 opacity-50">
+            <div className="size-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
+            <p className="font-bold uppercase tracking-widest text-xs">Carregando Orçamentos...</p>
+          </div>
+        ) : quotes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-20 opacity-30 text-center">
+            <span className="material-symbols-outlined text-[80px] mb-4">description</span>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Nenhum orçamento recebido ainda.</h2>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {quotes.map(quote => (
+              <div
+                key={quote.id}
+                className={`bg-white dark:bg-surface-dark p-4 rounded-3xl border ${quote.status === 'PENDING' ? 'border-primary/20 bg-primary/5' : 'border-gray-100 dark:border-white/5'} shadow-sm hover:shadow-md transition-all cursor-pointer`}
+                onClick={() => setSelectedQuote(quote)}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="size-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-bold text-slate-900 dark:text-white">
+                      {quote.client?.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{quote.client?.name}</h3>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-widest font-bold">
+                        {format(parseISO(quote.created_at), "d 'de' MMMM", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${quote.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                    quote.status === 'REPLIED' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                    }`}>
+                    {quote.status === 'PENDING' ? 'Pendente' : quote.status === 'REPLIED' ? 'Respondido' : 'Concluído'}
+                  </span>
+                </div>
+
+                <div className="flex gap-2 py-2 border-t border-gray-50 dark:border-white/5 mt-2 overflow-x-auto no-scrollbar">
+                  {quote.vehicle_photos?.slice(0, 3).map((p, i) => (
+                    <img key={i} src={p} className="size-16 rounded-xl object-cover" />
+                  ))}
+                  {quote.vehicle_photos?.length > 3 && (
+                    <div className="size-16 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center text-xs font-bold text-gray-500">
+                      +{quote.vehicle_photos.length - 3}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleWhatsApp(quote.client?.phone || '', `Olá ${quote.client?.name}, recebemos seu pedido de orçamento para o seu veículo ${quote.vehicle_model_year}. Podemos conversar sobre os detalhes?`);
+                    }}
+                    className="flex-1 bg-green-500 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">chat</span> WhatsApp
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedQuote(quote);
+                    }}
+                    className="p-2 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-500 flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-sm">visibility</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Quote Details Modal */}
+      {selectedQuote && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-background-dark w-full max-w-2xl max-h-[90vh] rounded-t-[32px] sm:rounded-[32px] overflow-hidden flex flex-col animate-slide-up">
+            <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-xl text-slate-900 dark:text-white">Detalhes do Orçamento</h3>
+              <button onClick={() => setSelectedQuote(null)} className="size-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-500"><span className="material-symbols-outlined">close</span></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+              {/* Client Info */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-surface-dark rounded-3xl">
+                <div>
+                  <h4 className="font-bold text-slate-900 dark:text-white">{selectedQuote.client?.name}</h4>
+                  <p className="text-sm text-gray-500">{selectedQuote.client?.phone}</p>
+                </div>
+                <button
+                  onClick={() => handleWhatsApp(selectedQuote.client?.phone || '', `Olá ${selectedQuote.client?.name}...`)}
+                  className="bg-green-500 text-white p-3 rounded-2xl shadow-lg shadow-green-500/20"
+                >
+                  <span className="material-symbols-outlined">chat</span>
+                </button>
+              </div>
+
+              {/* Vehicle Section */}
+              <section className="space-y-4">
+                <h5 className="font-bold text-primary uppercase text-[10px] tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">directions_car</span> Veículo
+                </h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-50 dark:bg-surface-dark rounded-2xl">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">Cor</p>
+                    <p className="font-bold text-slate-900 dark:text-white">{selectedQuote.vehicle_color}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-surface-dark rounded-2xl">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">Modelo/Ano</p>
+                    <p className="font-bold text-slate-900 dark:text-white">{selectedQuote.vehicle_model_year}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {selectedQuote.vehicle_photos?.map((p, i) => (
+                    <img key={i} src={p} className="aspect-square rounded-xl object-cover cursor-zoom-in" onClick={() => window.open(p, '_blank')} />
+                  ))}
+                </div>
+              </section>
+
+              {/* Polishing Section */}
+              <section className="space-y-4">
+                <h5 className="font-bold text-primary uppercase text-[10px] tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">auto_fix_high</span> Polimento
+                </h5>
+                <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+                  <p className="font-bold text-slate-900 dark:text-white mb-1">
+                    {selectedQuote.polishing_type === 'COMERCIAL' ? 'Polimento Comercial' :
+                      selectedQuote.polishing_type === 'TECNICO' ? 'Polimento Técnico' : 'Maquiagem Automotiva'}
+                  </p>
+                  <p className="text-xs text-gray-500 leading-relaxed italic">
+                    {selectedQuote.polishing_type === 'COMERCIAL' ? 'Etapa única, brilho e selante (7 meses).' :
+                      selectedQuote.polishing_type === 'TECNICO' ? 'Várias etapas, correção total e vitrificação (3 anos).' : 'Cera premium, máscara defeitos e brilho intenso (4 meses).'}
+                  </p>
+                </div>
+              </section>
+
+              {/* Upholstery Section */}
+              <section className="space-y-4">
+                <h5 className="font-bold text-primary uppercase text-[10px] tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">chair</span> Higienização de Estofados
+                </h5>
+                <div className="flex flex-wrap gap-2">
+                  {selectedQuote.upholstery_options?.map(opt => (
+                    <span key={opt} className="px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-xl text-xs font-bold text-slate-900 dark:text-white">
+                      {opt}
+                    </span>
+                  ))}
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {selectedQuote.upholstery_photos?.map((p, i) => (
+                    <img key={i} src={p} className="aspect-square rounded-xl object-cover cursor-zoom-in" onClick={() => window.open(p, '_blank')} />
+                  ))}
+                </div>
+              </section>
+
+              {/* Status Management */}
+              <div className="p-4 bg-gray-50 dark:bg-surface-dark rounded-3xl space-y-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase text-center">Alterar Status</p>
+                <div className="flex gap-2">
+                  {['PENDING', 'REPLIED', 'COMPLETED'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => handleUpdateStatus(selectedQuote.id, status)}
+                      className={`flex-1 py-3 rounded-2xl text-[10px] font-bold uppercase transition-all ${selectedQuote.status === status
+                        ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                        : 'bg-white dark:bg-background-dark text-gray-400 border border-gray-100 dark:border-white/5'
+                        }`}
+                    >
+                      {status === 'PENDING' ? 'Pendente' : status === 'REPLIED' ? 'Respondido' : 'Concluído'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminDashboard: React.FC<{
   appointments: Appointment[];
   onLogout: () => void;
@@ -2466,12 +3013,13 @@ const AdminDashboard: React.FC<{
   onSettings: () => void;
   onWeeklySchedule: () => void;
   onFinance: () => void;
+  onQuotes: () => void;
   onTV: () => void;
   onRefresh: () => void;
   onClients: () => void;
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   unreadCount: number;
-}> = ({ appointments, onLogout, onOpenChat, onManageServices, onBlockSchedule, onSettings, onWeeklySchedule, onFinance, onTV, onRefresh, onClients, setAppointments, unreadCount }) => {
+}> = ({ appointments, onLogout, onOpenChat, onManageServices, onBlockSchedule, onSettings, onWeeklySchedule, onFinance, onQuotes, onTV, onRefresh, onClients, setAppointments, unreadCount }) => {
   const availableDays = useMemo(() => getNextDays(7), []);
   const [selectedDateStr, setSelectedDateStr] = useState(availableDays[0].dateStr); // Default to local today string
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -2587,6 +3135,19 @@ const AdminDashboard: React.FC<{
             <div className="text-left">
               <h3 className="font-bold text-slate-900 dark:text-white">Clientes</h3>
               <p className="text-orange-500 text-[10px] font-bold uppercase tracking-widest">Gerenciar</p>
+            </div>
+          </button>
+
+          <button
+            onClick={onQuotes}
+            className="relative group flex flex-col p-4 rounded-3xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 hover:border-primary/30 active:scale-[0.98] transition-all overflow-hidden shadow-lg h-32 justify-between"
+          >
+            <div className="size-10 rounded-xl bg-violet-500 flex items-center justify-center text-white shadow-lg shadow-violet-500/20">
+              <span className="material-symbols-outlined filled">description</span>
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-slate-900 dark:text-white">Orçamentos</h3>
+              <p className="text-violet-500 text-[10px] font-bold uppercase tracking-widest">Personalizados</p>
             </div>
           </button>
 
@@ -3762,6 +4323,7 @@ const App: React.FC = () => {
             fetchServicesList(); // Refresh info
             setView('SELECT_SERVICES');
           }}
+          onQuote={() => setView('CUSTOM_QUOTE')}
           onChat={() => { setCurrentUserRole('CUSTOMER'); setView('CHAT'); }}
           onPerfil={() => {
             setView('CUSTOMER_LOGIN');
@@ -3819,6 +4381,7 @@ const App: React.FC = () => {
 
           onRefresh={fetchAppointments}
           onClients={() => setView('ADMIN_CLIENTS')}
+          onQuotes={() => setView('ADMIN_QUOTES')}
           setAppointments={setAppointments}
         />;
       case 'ADMIN_SERVICES':
@@ -3870,6 +4433,15 @@ const App: React.FC = () => {
             setCurrentUserRole('BARBER');
             setView('CHAT');
           }}
+        />;
+      case 'ADMIN_QUOTES':
+        return <AdminQuotesScreen onBack={() => setView('ADMIN_DASHBOARD')} />;
+      case 'CUSTOM_QUOTE':
+        return <CustomQuoteScreen
+          onBack={() => setView('HOME')}
+          setBooking={setBooking}
+          customerPhone={booking.customerPhone}
+          customerName={booking.customerName}
         />;
       default:
         return <LandingScreen onStart={() => setView('HOME')} onAdmin={() => setView('LOGIN')} />;
