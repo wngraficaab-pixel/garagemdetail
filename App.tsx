@@ -998,8 +998,13 @@ const SelectDateTimeScreen: React.FC<{
 
       while (true) {
         const currentSlotStart = h * 60 + m;
-        // Permissive logic: only check if the start time is within business hours
-        if (currentSlotStart >= shiftEndMins) break;
+        // If duration is <= 1 day (1440 mins), it must FIT in the current shift
+        if (myDuration <= 1440) {
+          if (currentSlotStart + myDuration > shiftEndMins) break;
+        } else {
+          // If duration is > 1 day, it just needs to START within the shift
+          if (currentSlotStart >= shiftEndMins) break;
+        }
 
         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
