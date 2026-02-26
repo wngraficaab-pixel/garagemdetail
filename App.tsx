@@ -636,7 +636,7 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
                 ].map(p => (
                   <button
                     key={p.id}
-                    onClick={() => setQuoteData({ ...quoteData, polishingType: p.id as any })}
+                    onClick={() => setQuoteData({ ...quoteData, polishingType: quoteData.polishingType === p.id ? '' : p.id as any })}
                     className={`w-full text-left p-4 rounded-2xl border transition-all ${quoteData.polishingType === p.id ? 'bg-primary/10 border-primary ring-1 ring-primary' : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/10'}`}
                   >
                     <div className="flex justify-between items-center mb-2">
