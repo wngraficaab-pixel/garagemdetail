@@ -311,7 +311,9 @@ const HomeScreen: React.FC<{
   onChat: () => void;
   onPerfil: () => void;
   onMais: () => void;
-}> = ({ onAgendar, onChat, onPerfil, onMais }) => (
+  address: string;
+  hours: string[];
+}> = ({ onAgendar, onChat, onPerfil, onMais, address, hours }) => (
   <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden pb-24 bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark transition-colors">
     <header className="sticky top-0 z-50 flex items-center justify-center bg-white/95 dark:bg-background-dark/95 backdrop-blur-md px-4 py-3 border-b border-gray-200 dark:border-white/5 gap-2 transition-colors">
       <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
@@ -356,8 +358,14 @@ const HomeScreen: React.FC<{
           </div>
           <div>
             <h3 className="font-bold text-lg">Horários de Funcionamento</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Seg - Sex: 09:00 - 20:00</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sáb: 09:00 - 18:00</p>
+            {hours.length > 0 ? (
+              hours.map((h, i) => <p key={i} className="text-sm text-gray-500 dark:text-gray-400">{h}</p>)
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Seg - Sex: 09:00 - 20:00</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Sáb: 09:00 - 18:00</p>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-start gap-3 mt-4">
@@ -366,8 +374,9 @@ const HomeScreen: React.FC<{
           </div>
           <div>
             <h3 className="font-bold text-lg">Endereço</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Rua Osman Loureiro, 33</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Centro, Água Branca - AL</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-pre-line">
+              {address || "Rua Osman Loureiro, 33\nCentro, Água Branca - AL"}
+            </p>
           </div>
         </div>
       </div>
@@ -1766,6 +1775,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [profileImage, setProfileImage] = useState('/renan.png');
   const [companyName, setCompanyName] = useState('Garagem Detail');
   const [companyTagline, setCompanyTagline] = useState('Seu estilo, no seu tempo. Agende seu corte em segundos.');
+  const [companyAddress, setCompanyAddress] = useState('Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -1782,6 +1792,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setProfileImage(s.profile_image || '/renan.png');
         setCompanyName(s.company_name || 'Garagem Detail');
         setCompanyTagline(s.company_tagline || 'Seu estilo, no seu tempo. Agende seu corte em segundos.');
+        setCompanyAddress(s.company_address || 'Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
       }
     };
     loadSettings();
@@ -1797,7 +1808,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       { key: 'profile_name', value: profileName },
       { key: 'profile_image', value: profileImage },
       { key: 'company_name', value: companyName },
-      { key: 'company_tagline', value: companyTagline }
+      { key: 'company_tagline', value: companyTagline },
+      { key: 'company_address', value: companyAddress }
     ];
 
     const { error } = await supabase.from('settings').upsert(updates);
@@ -1807,6 +1819,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       alert('Configurações salvas!');
       localStorage.setItem('company_name', companyName);
       localStorage.setItem('company_tagline', companyTagline);
+      localStorage.setItem('company_address', companyAddress);
       localStorage.setItem('profile_name', profileName);
       localStorage.setItem('profile_image', profileImage);
     }
@@ -1829,6 +1842,10 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div>
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Tagline / Descrição (Landing Page)</label>
             <textarea value={companyTagline} onChange={e => setCompanyTagline(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" rows={2} placeholder="Ex: Seu estilo, no seu tempo..." />
+          </div>
+          <div>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Endereço da Empresa</label>
+            <textarea value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" rows={2} placeholder="Ex: Rua Tal, 123..." />
           </div>
 
           <div className="pt-4 border-t border-gray-100 dark:border-white/5"></div>
@@ -3052,9 +3069,31 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchServicesList();
     // Fetch profile info and save to localStorage for cross-screen sync
-    supabase.from('settings').select('*').in('key', ['profile_name', 'profile_image', 'company_name', 'company_tagline']).then(({ data }) => {
+    supabase.from('settings').select('*').in('key', ['profile_name', 'profile_image', 'company_name', 'company_tagline', 'company_address']).then(({ data }) => {
       if (data) {
         data.forEach((r: any) => localStorage.setItem(r.key, r.value));
+      }
+    });
+
+    // Fetch work hours for HomeScreen display
+    supabase.from('work_hours').select('*').eq('is_open', true).then(({ data }) => {
+      if (data) {
+        // Group similar hours
+        const groups: { [key: string]: number[] } = {};
+        data.forEach((w: any) => {
+          const timeRange = `${w.start_time.slice(0, 5)} - ${w.end_time.slice(0, 5)}`;
+          if (!groups[timeRange]) groups[timeRange] = [];
+          groups[timeRange].push(w.day_of_week);
+        });
+
+        const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const formatted = Object.entries(groups).map(([range, days]) => {
+          if (days.length === 5 && days.every(d => d >= 1 && d <= 5)) return `Seg - Sex: ${range}`;
+          if (days.length === 6 && days.every(d => d >= 1 && d <= 6)) return `Seg - Sáb: ${range}`;
+          const label = days.map(d => dayNames[d]).join(', ');
+          return `${label}: ${range}`;
+        });
+        localStorage.setItem('business_hours', JSON.stringify(formatted));
       }
     });
   }, []);
