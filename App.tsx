@@ -2028,15 +2028,44 @@ const AdminCalendarView: React.FC<{
   const PIXELS_PER_MINUTE = 2; // Increased for better visibility (120px per hour)
 
   // Filter apps for selected date (Robust string comparison)
-  const dayApps = appointments.filter(a => a.date === selectedDateStr && a.status !== 'CANCELLED');
+  // Filter apps that overlap with the selected date
+  const dayApps = appointments.filter(app => {
+    if (app.status === 'CANCELLED') return false;
+
+    const selectedDateStart = new Date(`${selectedDateStr}T00:00:00`).getTime();
+    const selectedDateEnd = selectedDateStart + (24 * 60 * 60000);
+
+    const totalDuration = app.services.reduce((sum, s) => sum + s.duration, 0) || 30;
+    const appStart = new Date(`${app.date}T${app.time}:00`).getTime();
+    const appEnd = appStart + (totalDuration * 60000);
+
+    // Overlap condition: app starts before date ends and ends after date starts
+    return appStart < selectedDateEnd && appEnd > selectedDateStart;
+  });
 
   // Helper to calculate position
-  const getPosition = (timeStr: string, duration: number) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    const startMinutes = (h * 60 + m) - (START_HOUR * 60);
+  // Helper to calculate position for the current day
+  const getPosition = (appDate: string, appTime: string, duration: number) => {
+    const selectedDateStart = new Date(`${selectedDateStr}T00:00:00`).getTime();
+    const appStart = new Date(`${appDate}T${appTime}:00`).getTime();
+    const appEnd = appStart + (duration * 60000);
+    const dayStart = selectedDateStart + (START_HOUR * 60 * 60000);
+    const dayEnd = selectedDateStart + (END_HOUR * 60 * 60000);
+
+    // Calculate relative start and end within the visible day window
+    const visibleStart = Math.max(appStart, dayStart);
+    const visibleEnd = Math.min(appEnd, dayEnd);
+
+    if (visibleEnd <= visibleStart) return null;
+
+    const topMinutes = (visibleStart - dayStart) / 60000;
+    const heightMinutes = (visibleEnd - visibleStart) / 60000;
+
     return {
-      top: startMinutes * PIXELS_PER_MINUTE,
-      height: duration * PIXELS_PER_MINUTE
+      top: topMinutes * PIXELS_PER_MINUTE,
+      height: heightMinutes * PIXELS_PER_MINUTE,
+      isContinuesPrevious: appStart < dayStart,
+      isContinuesNext: appEnd > dayEnd
     };
   };
 
@@ -2084,7 +2113,8 @@ const AdminCalendarView: React.FC<{
           <div className="flex-1 relative bg-white dark:bg-surface-dark bg-[linear-gradient(to_bottom,transparent_119px,rgba(0,0,0,0.05)_120px)] dark:bg-[linear-gradient(to_bottom,transparent_119px,rgba(255,255,255,0.05)_120px)] bg-[size:100%_120px]">
             {dayApps.map(app => {
               const totalDuration = app.services.reduce((sum, s) => sum + s.duration, 0) || 30;
-              const pos = getPosition(app.time, totalDuration);
+              const pos = getPosition(app.date, app.time, totalDuration);
+              if (!pos) return null;
 
               return (
                 <div
@@ -2094,15 +2124,20 @@ const AdminCalendarView: React.FC<{
                       ${app.status === 'COMPLETED' ? 'bg-green-100 border-green-500 text-green-900' :
                       app.status === 'CONFIRMED' ? 'bg-blue-100 border-blue-500 text-blue-900' :
                         'bg-yellow-100 border-yellow-500 text-yellow-900'}
+                      ${pos.isContinuesPrevious ? 'rounded-t-none border-t border-dashed border-t-black/10' : ''}
+                      ${pos.isContinuesNext ? 'rounded-b-none border-b border-dashed border-b-black/10' : ''}
                     `}
-                  style={{ top: `${pos.top}px`, height: `${pos.height}px` }}
+                  style={{ top: `${pos.top}px`, height: `${pos.height}px`, zIndex: 20 }}
                 >
                   <div className="flex justify-between items-start">
                     <span className="font-bold text-xs truncate">{app.customerName}</span>
-                    <span className="text-[10px] font-mono opacity-80">{app.time}</span>
+                    <span className="text-[10px] font-mono opacity-80">
+                      {pos.isContinuesPrevious ? 'cont...' : app.time}
+                    </span>
                   </div>
                   <div className="text-[10px] opacity-90 truncate mt-0.5">
                     {app.services.map(s => s.name).join(', ')}
+                    {pos.isContinuesNext && ' ...'}
                   </div>
                 </div>
               );
