@@ -1877,7 +1877,6 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     </div>
   );
 };
-};
 
 
 
