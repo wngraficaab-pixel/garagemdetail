@@ -27,9 +27,10 @@ export interface Quote {
   vehicle_color: string;
   vehicle_model_year: string;
   vehicle_photos: string[];
-  polishing_type: 'COMERCIAL' | 'TECNICO' | 'MAQUIAGEM' | '';
+  polishing_type: 'COMERCIAL' | 'TECNICO' | 'MAQUIAGEM' | 'LOCALIZADO' | '';
   upholstery_options: string[];
   upholstery_photos: string[];
+  localized_polishing_photos?: string[];
   status: 'PENDING' | 'REPLIED' | 'COMPLETED';
   is_read: boolean;
   created_at: string;

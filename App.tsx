@@ -435,12 +435,13 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
     vehicleColor: '',
     vehicleModelYear: '',
     vehiclePhotos: [] as string[],
-    polishingType: '' as 'COMERCIAL' | 'TECNICO' | 'MAQUIAGEM' | '',
+    polishingType: '' as 'COMERCIAL' | 'TECNICO' | 'MAQUIAGEM' | 'LOCALIZADO' | '',
     upholsteryOptions: [] as string[],
-    upholsteryPhotos: [] as string[]
+    upholsteryPhotos: [] as string[],
+    localizedPhotos: [] as string[]
   });
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'vehiclePhotos' | 'upholsteryPhotos') => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'vehiclePhotos' | 'upholsteryPhotos' | 'localizedPhotos') => {
     const files = e.target.files;
     if (!files) return;
 
@@ -456,7 +457,7 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
     });
   };
 
-  const removePhoto = (index: number, field: 'vehiclePhotos' | 'upholsteryPhotos') => {
+  const removePhoto = (index: number, field: 'vehiclePhotos' | 'upholsteryPhotos' | 'localizedPhotos') => {
     setQuoteData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
@@ -485,6 +486,7 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
         polishing_type: quoteData.polishingType,
         upholstery_options: quoteData.upholsteryOptions,
         upholstery_photos: quoteData.upholsteryPhotos,
+        localized_polishing_photos: quoteData.localizedPhotos,
         status: 'PENDING'
       });
 
@@ -632,6 +634,11 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
                     id: 'MAQUIAGEM',
                     title: 'Maquiagem Automotiva',
                     desc: 'Cera de alta tecnologia e performance aplicada na pintura que promove brilho intenso e máscara a maior parte dos defeitos, com proteção contra o tempo e hidrorepelência que duram até 4 meses.'
+                  },
+                  {
+                    id: 'LOCALIZADO',
+                    title: 'Polimento Localizado',
+                    desc: 'Pensado em eliminar ou amenizar arranhões mais profundos ou muito chamativos numa área localizada. Requer no mínimo duas fotos (uma de perto e outra da região).'
                   }
                 ].map(p => (
                   <button
@@ -647,6 +654,29 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
                   </button>
                 ))}
               </div>
+
+              {quoteData.polishingType === 'LOCALIZADO' && (
+                <div className="space-y-3 animate-enter p-4 bg-orange-50 dark:bg-orange-500/10 rounded-2xl border border-orange-100 dark:border-orange-500/20">
+                  <p className="text-sm font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">add_a_photo</span> Fotos do Arranhão (Obrigatório)
+                  </p>
+                  <p className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">Envie pelo menos 2 fotos: uma de perto do arranhão e outra mostrando a região.</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {quoteData.localizedPhotos.map((p, i) => (
+                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
+                        <img src={p} className="w-full h-full object-cover" />
+                        <button onClick={() => removePhoto(i, 'localizedPhotos')} className="absolute top-1 right-1 size-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="material-symbols-outlined text-[10px]">close</span>
+                        </button>
+                      </div>
+                    ))}
+                    <label className="aspect-square border-2 border-dashed border-orange-300 dark:border-orange-500/20 rounded-lg flex items-center justify-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-500/5 transition-colors">
+                      <input type="file" multiple accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'localizedPhotos')} />
+                      <span className="material-symbols-outlined text-orange-400">add_a_photo</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="space-y-4 pt-4 border-t border-gray-100 dark:border-white/5">
@@ -702,7 +732,10 @@ const CustomQuoteScreen: React.FC<{ onBack: () => void; setBooking: React.Dispat
             <div className="flex gap-3 pt-6">
               <button onClick={() => setStep('VEHICLE')} className="flex-1 py-4 text-gray-500 font-bold">Voltar</button>
               <button
-                disabled={loading || (!quoteData.polishingType && quoteData.upholsteryOptions.length === 0)}
+                disabled={loading ||
+                  (!quoteData.polishingType && quoteData.upholsteryOptions.length === 0) ||
+                  (quoteData.polishingType === 'LOCALIZADO' && quoteData.localizedPhotos.length < 2)
+                }
                 onClick={handleSubmit}
                 className="flex-[2] bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center"
               >
@@ -931,16 +964,26 @@ const SelectDateTimeScreen: React.FC<{
         .neq('status', 'CANCELLED');
 
       if (apps) {
-        setExistingAppointments(apps.map((a: any) => {
-          // Calculate total duration for this existing appointment
-          const totalDuration = a.services?.reduce((sum: number, item: any) => sum + (item.service?.duration || 30), 0) || 30;
+        const mappedApps = await Promise.all(apps.map(async (a: any) => {
+          // Calculate total duration for this existing appointment using stacking logic
+          const durationsMap = new Map<number, number>();
+          (a.services || []).forEach((item: any) => {
+            const d = item.service?.duration || 30;
+            durationsMap.set(d, d);
+          });
+          const baseDuration = (Array.from(durationsMap.values()).reduce((sum, d) => sum + d, 0)) || 30;
+
+          const { data: extras } = await supabase.from('appointment_extras').select('duration').eq('appointment_id', a.id);
+          const extrasDuration = extras?.reduce((sum, e) => sum + (e.duration || 0), 0) || 0;
+
           return {
             ...a,
             date: a.appointment_date,
             time: a.appointment_time?.slice(0, 5) || a.appointment_time,
-            duration: totalDuration
+            duration: baseDuration + extrasDuration
           };
         }));
+        setExistingAppointments(mappedApps);
       }
 
       // Fetch Settings: min_advance_minutes
@@ -966,11 +1009,24 @@ const SelectDateTimeScreen: React.FC<{
 
     const times: string[] = [];
     const step = 15;
-    const myDuration = booking.selectedServices.reduce((sum, s) => {
+    // Calculate sequential vs stacked duration
+    const services = booking.selectedServices;
+    const sequentialDuration = services.reduce((sum, s) => {
       const extras = booking.selectedExtras[s.id] || [];
       const extrasDuration = extras.reduce((eacc, e) => eacc + e.duration, 0);
       return sum + s.duration + extrasDuration;
     }, 0) || 30;
+
+    // Stacked duration: Group by base service duration, then add extras
+    const durationsMap = new Map<number, number>();
+    services.forEach(s => {
+      const currentMax = durationsMap.get(s.duration) || 0;
+      if (s.duration > currentMax) durationsMap.set(s.duration, s.duration);
+    });
+
+    // Add all extras to the total
+    const totalExtrasDuration = (Object.values(booking.selectedExtras).flat() as { duration: number }[]).reduce((sum, e) => sum + e.duration, 0);
+    const stackedDuration = (Array.from(durationsMap.values()).reduce((sum, d) => sum + d, 0) || 30) + totalExtrasDuration;
 
     const generateSlots = (start: string, end: string) => {
       if (!start || !end) return;
@@ -996,6 +1052,8 @@ const SelectDateTimeScreen: React.FC<{
         const currentSlotStart = h * 60 + m;
 
         // --- 1. Shift End Check ---
+        let myDuration = stackedDuration;
+
         // If duration is <= 1 day, it must fit in the current shift (considering tolerance)
         if (myDuration <= 1440) {
           if (currentSlotStart + myDuration > (shiftEndMins + toleranceMins)) break;
@@ -1051,17 +1109,25 @@ const SelectDateTimeScreen: React.FC<{
           if (!isBlocked) {
             const slotStart = new Date(`${selectedDateStr}T${timeStr}:00`).getTime();
 
-            for (const app of existingAppointments) {
-              if (app.status !== 'CANCELLED') {
-                const appStart = new Date(`${app.date}T${app.time}:00`).getTime();
-                const appEnd = appStart + (app.duration * 60000);
+            // Check for ANY overlap in the window [slotStart, slotStart + myDuration]
+            const overlappingApps = existingAppointments.filter(app => {
+              if (app.status === 'CANCELLED') return false;
+              if (app.date !== selectedDateStr) return false;
 
-                // If the current slot start falls anywhere within the appointment duration
-                if (slotStart >= appStart && slotStart < appEnd) {
-                  isBlocked = true;
-                  break;
-                }
-              }
+              const appStart = new Date(`${app.date}T${app.time}:00`).getTime();
+              const appEnd = appStart + (app.duration * 60000);
+              const slotEnd = slotStart + (myDuration * 60000);
+
+              // OVERLAP LOGIC:
+              // For new appointment (slotStart to slotEnd)
+              // and existing appointment (appStart to appEnd)
+              // They overlap if the start of one is before the end of the other, AND the end of one is after the start of the other
+              return (slotStart < appEnd && slotEnd > appStart);
+            });
+
+            if (overlappingApps.length > 0) {
+              // If there is ANY overlap, this slot is completely blocked
+              isBlocked = true;
             }
           }
         }
@@ -3017,13 +3083,22 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl">
                   <p className="font-bold text-slate-900 dark:text-white mb-1">
                     {selectedQuote.polishing_type === 'COMERCIAL' ? 'Polimento Comercial' :
-                      selectedQuote.polishing_type === 'TECNICO' ? 'Polimento Técnico' : 'Maquiagem Automotiva'}
+                      selectedQuote.polishing_type === 'TECNICO' ? 'Polimento Técnico' :
+                        selectedQuote.polishing_type === 'LOCALIZADO' ? 'Polimento Localizado' : 'Maquiagem Automotiva'}
                   </p>
                   <p className="text-xs text-gray-500 leading-relaxed italic">
                     {selectedQuote.polishing_type === 'COMERCIAL' ? 'Etapa única, brilho e selante (7 meses).' :
-                      selectedQuote.polishing_type === 'TECNICO' ? 'Várias etapas, correção total e vitrificação (3 anos).' : 'Cera premium, máscara defeitos e brilho intenso (4 meses).'}
+                      selectedQuote.polishing_type === 'TECNICO' ? 'Várias etapas, correção total e vitrificação (3 anos).' :
+                        selectedQuote.polishing_type === 'LOCALIZADO' ? 'Focado em eliminar ou amenizar arranhões profundos em área específica.' : 'Cera premium, máscara defeitos e brilho intenso (4 meses).'}
                   </p>
                 </div>
+                {selectedQuote.polishing_type === 'LOCALIZADO' && selectedQuote.localized_polishing_photos && selectedQuote.localized_polishing_photos.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mt-4">
+                    {selectedQuote.localized_polishing_photos.map((p, i) => (
+                      <img key={i} src={p} className="aspect-square rounded-xl object-cover cursor-zoom-in" onClick={() => window.open(p, '_blank')} />
+                    ))}
+                  </div>
+                )}
               </section>
 
               {/* Upholstery Section */}
