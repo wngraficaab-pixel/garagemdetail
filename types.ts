@@ -83,8 +83,9 @@ export interface BookingState {
   customerPhone: string;
   selectedServices: Service[];
   selectedExtras: { [serviceId: string]: ServiceExtra[] };
-  selectedDate: string;
-  selectedTime: string;
+  selectedDate: string; // Legacy/Main
+  selectedTime: string; // Legacy/Main
+  selectedSlots?: { serviceId: string, date: string, time: string }[]; // New for multi-session
 }
 
 export interface ChatMessage {

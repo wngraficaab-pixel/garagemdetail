@@ -941,6 +941,7 @@ const SelectDateTimeScreen: React.FC<{
   const [existingAppointments, setExistingAppointments] = useState<any[]>([]);
   const [workHours, setWorkHours] = useState<any[]>([]);
   const [minAdvance, setMinAdvance] = useState(0);
+  const [bookingMode, setBookingMode] = useState<'SAME_DAY' | 'DIFFERENT_DAYS'>('SAME_DAY');
 
   useEffect(() => {
     const initData = async () => {
@@ -1009,24 +1010,15 @@ const SelectDateTimeScreen: React.FC<{
 
     const times: string[] = [];
     const step = 15;
-    // Calculate sequential vs stacked duration
-    const services = booking.selectedServices;
-    const sequentialDuration = services.reduce((sum, s) => {
-      const extras = booking.selectedExtras[s.id] || [];
-      const extrasDuration = extras.reduce((eacc, e) => eacc + e.duration, 0);
-      return sum + s.duration + extrasDuration;
-    }, 0) || 30;
 
-    // Stacked duration: Group by base service duration, then add extras
-    const durationsMap = new Map<number, number>();
-    services.forEach(s => {
-      const currentMax = durationsMap.get(s.duration) || 0;
-      if (s.duration > currentMax) durationsMap.set(s.duration, s.duration);
-    });
+    // The required duration for a slot to be shown is the MAXIMUM duration among chosen services.
+    const myDuration = Math.max(...booking.selectedServices.map(s => {
+      const sExtras = booking.selectedExtras[s.id] || [];
+      return s.duration + sExtras.reduce((sum, e) => sum + e.duration, 0);
+    })) || 30;
 
-    // Add all extras to the total
-    const totalExtrasDuration = (Object.values(booking.selectedExtras).flat() as { duration: number }[]).reduce((sum, e) => sum + e.duration, 0);
-    const stackedDuration = (Array.from(durationsMap.values()).reduce((sum, d) => sum + d, 0) || 30) + totalExtrasDuration;
+    // We intentionally do not block already selected slots so they don't disappear from the grid.
+    const allExistingAppointments = [...existingAppointments];
 
     const generateSlots = (start: string, end: string) => {
       if (!start || !end) return;
@@ -1052,8 +1044,6 @@ const SelectDateTimeScreen: React.FC<{
         const currentSlotStart = h * 60 + m;
 
         // --- 1. Shift End Check ---
-        let myDuration = stackedDuration;
-
         // If duration is <= 1 day, it must fit in the current shift (considering tolerance)
         if (myDuration <= 1440) {
           if (currentSlotStart + myDuration > (shiftEndMins + toleranceMins)) break;
@@ -1110,7 +1100,7 @@ const SelectDateTimeScreen: React.FC<{
             const slotStart = new Date(`${selectedDateStr}T${timeStr}:00`).getTime();
 
             // Check for ANY overlap in the window [slotStart, slotStart + myDuration]
-            const overlappingApps = existingAppointments.filter(app => {
+            const overlappingApps = allExistingAppointments.filter(app => {
               if (app.status === 'CANCELLED') return false;
               if (app.date !== selectedDateStr) return false;
 
@@ -1153,20 +1143,123 @@ const SelectDateTimeScreen: React.FC<{
 
     setAvailableTimes(times);
 
-  }, [selectedDateIndex, blockedSlots, workHours, existingAppointments, booking.selectedServices, minAdvance]);
+  }, [selectedDateIndex, blockedSlots, workHours, existingAppointments, booking.selectedServices, minAdvance, booking.selectedSlots, bookingMode]);
 
   const handleTimeSelect = (time: string) => {
-    setBooking({ ...booking, selectedDate: nextDays[selectedDateIndex].dateStr, selectedTime: time });
+    const selectedDateStr = nextDays[selectedDateIndex].dateStr;
+    const currentSlots = booking.selectedSlots || [];
+
+    // Check if clicking an already selected slot
+    const existingIndex = currentSlots.findIndex(s => s.time === time && s.date === selectedDateStr);
+    if (existingIndex >= 0) {
+      if (bookingMode === 'SAME_DAY') {
+        // Deselect all
+        setBooking({ ...booking, selectedSlots: [] });
+      } else {
+        // Deselect one
+        const newSlots = currentSlots.filter((_, i) => i !== existingIndex);
+        setBooking({ ...booking, selectedSlots: newSlots });
+      }
+      return;
+    }
+
+    // Limit check
+    if (currentSlots.length >= booking.selectedServices.length) {
+      alert('Você já selecionou a quantidade necessária de horários para os serviços escolhidos.');
+      return;
+    }
+
+    // Shift check boundaries
+    const toMins = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const lunchStartStr = localStorage.getItem('lunch_start') || '12:00';
+    const lunchStartMins = toMins(lunchStartStr);
+
+    const timeMins = toMins(time);
+    const isMorning = timeMins < lunchStartMins;
+
+    if (bookingMode === 'SAME_DAY' && booking.selectedServices.length === 2) {
+      // Find counterpart in the availableTimes array on the same day
+      const counterpartSlot = availableTimes.find(t => {
+        const tMins = toMins(t);
+        const tIsMorning = tMins < lunchStartMins;
+        return isMorning !== tIsMorning; // must be in the opposite shift
+      });
+
+      if (!counterpartSlot) {
+        alert('Infelizmente não há horários disponíveis nos dois turnos para este dia. Escolha a opção "Dias Diferentes" ou navegue para outro dia.');
+        return;
+      }
+
+      // We have both! Auto-select them.
+      const s1 = booking.selectedServices[0];
+      const s2 = booking.selectedServices[1];
+
+      const newSlots = [];
+      if (isMorning) {
+        newSlots.push({ serviceId: s1.id, date: selectedDateStr, time: time });
+        newSlots.push({ serviceId: s2.id, date: selectedDateStr, time: counterpartSlot });
+      } else {
+        newSlots.push({ serviceId: s1.id, date: selectedDateStr, time: counterpartSlot });
+        newSlots.push({ serviceId: s2.id, date: selectedDateStr, time: time });
+      }
+      setBooking({ ...booking, selectedSlots: newSlots, selectedDate: newSlots[0].date, selectedTime: newSlots[0].time });
+
+    } else {
+      // DIFFERENT_DAYS or fallback
+      const hasSameDaySameShift = currentSlots.some(s => {
+        if (s.date !== selectedDateStr) return false;
+        const sMins = toMins(s.time);
+        const sIsMorning = sMins < lunchStartMins;
+        return isMorning === sIsMorning;
+      });
+
+      if (hasSameDaySameShift) {
+        alert('Você só pode selecionar um horário por turno (manhã/tarde) no mesmo dia.');
+        return;
+      }
+
+      // Map to the first unassigned service
+      const assignedServiceIds = currentSlots.map(s => s.serviceId);
+      const nextService = booking.selectedServices.find(s => !assignedServiceIds.includes(s.id));
+      if (!nextService) return;
+
+      const newSlots = [...currentSlots, { serviceId: nextService.id, date: selectedDateStr, time }];
+      setBooking({ ...booking, selectedSlots: newSlots, selectedDate: newSlots[0]?.date || '', selectedTime: newSlots[0]?.time || '' });
+    }
   };
+
+  const selectedDateStr = nextDays[selectedDateIndex].dateStr;
+  const currentSlotsOnDate = (booking.selectedSlots || []).filter(s => s.date === selectedDateStr);
 
   return (
     <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col transition-colors">
       <header className="p-4 border-b border-gray-200 dark:border-white/5 bg-white dark:bg-background-dark flex items-center justify-between transition-colors">
         <button onClick={onBack} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-400"><span className="material-symbols-outlined">arrow_back</span></button>
-        <span className="font-bold text-slate-900 dark:text-white">Escolha o Horário</span>
+        <div className="flex flex-col items-center">
+          <span className="font-bold text-slate-900 dark:text-white">Escolha os Horários</span>
+          <span className="text-xs text-primary font-bold text-center">
+            {booking.selectedServices.length > 1 ? `Selecione ${booking.selectedServices.length} horários` : ''}
+          </span>
+        </div>
         <div className="size-10"></div>
       </header>
-      <main className="p-6">
+      {booking.selectedServices.length > 1 && (
+        <div className="p-4 bg-white dark:bg-background-dark border-b border-gray-200 dark:border-white/5 flex gap-2 justify-center transition-colors">
+          <button
+            onClick={() => { setBookingMode('SAME_DAY'); setBooking({ ...booking, selectedSlots: [] }); }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all ${bookingMode === 'SAME_DAY' ? 'bg-slate-900 text-white dark:bg-white dark:text-black shadow-md' : 'bg-gray-100 dark:bg-white/5 text-gray-500 hover:bg-gray-200 dark:hover:bg-white/10'}`}
+          >
+            No mesmo dia
+          </button>
+          <button
+            onClick={() => { setBookingMode('DIFFERENT_DAYS'); setBooking({ ...booking, selectedSlots: [] }); }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all ${bookingMode === 'DIFFERENT_DAYS' ? 'bg-slate-900 text-white dark:bg-white dark:text-black shadow-md' : 'bg-gray-100 dark:bg-white/5 text-gray-500 hover:bg-gray-200 dark:hover:bg-white/10'}`}
+          >
+            Dias diferentes
+          </button>
+        </div>
+      )}
+      <main className="p-4 flex-1">
         <h3 className="text-slate-900 dark:text-white font-bold mb-4">Dias Disponíveis</h3>
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-4 mb-6">
           {nextDays.map((d, i) => (
@@ -1186,27 +1279,35 @@ const SelectDateTimeScreen: React.FC<{
 
         <h3 className="text-slate-900 dark:text-white font-bold mb-4">Horários Livres</h3>
         <div className="grid grid-cols-4 gap-3">
-          {availableTimes.map((t) => (
-            <button
-              key={t}
-              onClick={() => handleTimeSelect(t)}
-              className={`p-3 rounded-xl border font-bold text-sm transition-all ${booking.selectedTime === t && booking.selectedDate === nextDays[selectedDateIndex].dateStr
-                ? 'bg-slate-900 dark:bg-white text-white dark:text-black border-slate-900 dark:border-white'
-                : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/5 text-slate-900 dark:text-white hover:border-gray-300 dark:hover:border-white/20'
-                }`}
-            >
-              {t}
-            </button>
-          ))}
+          {availableTimes.map((t) => {
+            const isSelected = currentSlotsOnDate.some(s => s.time === t);
+            return (
+              <button
+                key={t}
+                onClick={() => handleTimeSelect(t)}
+                className={`p-3 rounded-xl border font-bold text-sm transition-all ${isSelected
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-black border-slate-900 dark:border-white shadow-md'
+                  : 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/5 text-slate-900 dark:text-white hover:border-gray-300 dark:hover:border-white/20'
+                  }`}
+              >
+                {t}
+              </button>
+            );
+          })}
         </div>
       </main>
       <footer className="p-4 mt-auto border-t border-gray-200 dark:border-white/5 bg-white dark:bg-background-dark transition-colors">
         <button
           onClick={onNext}
-          disabled={!booking.selectedTime}
-          className="w-full bg-primary disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20"
+          disabled={booking.selectedSlots?.length !== booking.selectedServices.length}
+          className="w-full bg-primary disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 flex flex-col items-center justify-center gap-1"
         >
-          Continuar
+          <span>Continuar</span>
+          {(booking.selectedSlots?.length || 0) < booking.selectedServices.length && (
+            <span className="text-[10px] font-normal opacity-80">
+              Faltam {(booking.selectedServices.length - (booking.selectedSlots?.length || 0))} horários
+            </span>
+          )}
         </button>
       </footer>
     </div>
@@ -1696,11 +1797,21 @@ const ReviewScreen: React.FC<{
               <p className="font-medium text-sm text-slate-900 dark:text-white">{booking.customerName} • {booking.customerPhone}</p>
             </div>
           </div>
-          <div className="p-4 flex gap-4 items-center border-t border-gray-100 dark:border-white/5 transition-colors">
-            <div className="size-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center"><span className="material-symbols-outlined">calendar_month</span></div>
-            <div>
-              <span className="text-[10px] text-gray-500 uppercase font-bold">Data e Hora</span>
-              <p className="font-medium text-sm text-slate-900 dark:text-white">{formatDateToBRL(booking.selectedDate)} • {booking.selectedTime}</p>
+          <div className="p-4 flex flex-col gap-4 border-t border-gray-100 dark:border-white/5 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="size-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center"><span className="material-symbols-outlined text-lg">calendar_month</span></div>
+              <span className="text-[10px] text-gray-500 uppercase font-bold">Datas e Horários</span>
+            </div>
+            <div className="pl-12 space-y-3">
+              {booking.selectedSlots?.map((slot, idx) => {
+                const service = booking.selectedServices.find(s => s.id === slot.serviceId);
+                return (
+                  <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-white/5 p-3 rounded-xl border border-gray-100 dark:border-white/10">
+                    <span className="text-xs font-bold text-slate-800 dark:text-gray-200">{service?.name}</span>
+                    <span className="text-xs text-primary font-bold">{formatDateToBRL(slot.date)} • {slot.time}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -1738,7 +1849,7 @@ const ReviewScreen: React.FC<{
           <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
         </button>
       </footer>
-    </div>
+    </div >
   );
 };
 
@@ -4391,67 +4502,64 @@ const App: React.FC = () => {
       clientId = newClient.id;
     }
 
-    // 1.5 Check Availability
-    const { data: dayApps } = await supabase
-      .from('appointments')
-      .select('appointment_time')
-      .eq('appointment_date', booking.selectedDate)
-      .neq('status', 'CANCELLED');
+    // 1.5 Check Availability and Insert Loop
+    let allSuccess = true;
+    for (const slot of booking.selectedSlots || []) {
+      const service = booking.selectedServices.find(s => s.id === slot.serviceId);
+      if (!service) continue;
 
-    const { data: dayBlocks } = await supabase
-      .from('blocked_slots')
-      .select('time')
-      .eq('date', booking.selectedDate);
+      const extras = booking.selectedExtras[service.id] || [];
+      const slotPrice = service.price + extras.reduce((sum, e) => sum + e.price, 0);
 
-    const isTaken = dayApps?.some(a => a.appointment_time?.startsWith(booking.selectedTime));
-    const isBlocked = dayBlocks?.some(b => b.time?.startsWith(booking.selectedTime));
+      const { data: dayApps } = await supabase.from('appointments').select('appointment_time').eq('appointment_date', slot.date).neq('status', 'CANCELLED');
+      const { data: dayBlocks } = await supabase.from('blocked_slots').select('time').eq('date', slot.date);
 
-    if (isTaken || isBlocked) {
-      alert('Este horário acabou de ser reservado ou bloqueado. Por favor, escolha outro.');
-      return;
+      const isTaken = dayApps?.some(a => a.appointment_time?.startsWith(slot.time));
+      const isBlocked = dayBlocks?.some(b => b.time?.startsWith(slot.time));
+
+      if (isTaken || isBlocked) {
+        alert(`O horário ${slot.date} às ${slot.time} para ${service.name} acabou de ser reservado ou bloqueado. Volte e escolha outro.`);
+        allSuccess = false;
+        break;
+      }
+
+      // 2. Create Appointment
+      const { data: appData, error: appError } = await supabase.from('appointments').insert({
+        client_id: clientId,
+        appointment_date: slot.date,
+        appointment_time: slot.time,
+        total_price: slotPrice,
+        status: 'PENDING'
+      }).select().single();
+
+      if (appError || !appData) {
+        alert('Erro ao agendar: ' + (appError?.message || ''));
+        allSuccess = false;
+        break;
+      }
+
+      // 3. Insert Service
+      await supabase.from('appointment_services').insert([{
+        appointment_id: appData.id,
+        service_id: service.id,
+        price_at_booking: service.price
+      }]);
+
+      // 4. Insert Extras
+      const extraInserts = extras.map(extra => ({
+        appointment_id: appData.id,
+        extra_id: extra.id,
+        name: extra.name,
+        price: extra.price,
+        duration: extra.duration
+      }));
+
+      if (extraInserts.length > 0) {
+        await supabase.from('appointment_extras').insert(extraInserts);
+      }
     }
 
-    // 2. Create Appointment
-    const totalPrice = booking.selectedServices.reduce((sum, s) => {
-      const extras = booking.selectedExtras[s.id] || [];
-      const extrasTotal = extras.reduce((esum, e) => esum + e.price, 0);
-      return sum + s.price + extrasTotal;
-    }, 0);
-
-    const { data: appData, error: appError } = await supabase.from('appointments').insert({
-      client_id: clientId,
-      appointment_date: booking.selectedDate,
-      appointment_time: booking.selectedTime,
-      total_price: totalPrice,
-      status: 'PENDING'
-    }).select().single();
-
-    if (appError || !appData) { alert('Erro ao agendar: ' + (appError?.message || '')); return; }
-
-    // 3. Insert Services
-    const serviceInserts = booking.selectedServices.map(s => ({
-      appointment_id: appData.id,
-      service_id: s.id,
-      price_at_booking: s.price
-    }));
-    await supabase.from('appointment_services').insert(serviceInserts);
-
-    // 4. Insert Extras
-    const extraInserts: any[] = [];
-    Object.entries(booking.selectedExtras).forEach(([serviceId, extras]) => {
-      (extras as ServiceExtra[]).forEach(extra => {
-        extraInserts.push({
-          appointment_id: appData.id,
-          extra_id: extra.id,
-          name: extra.name,
-          price: extra.price,
-          duration: extra.duration
-        });
-      });
-    });
-    if (extraInserts.length > 0) {
-      await supabase.from('appointment_extras').insert(extraInserts);
-    }
+    if (!allSuccess) return;
 
     // Success
     setShowSuccess(true);
