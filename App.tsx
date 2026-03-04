@@ -1,7 +1,7 @@
 import ReloadPrompt from './src/ReloadPrompt';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { AppView, Service, BookingState, Appointment, ChatMessage, ServiceExtra, Quote } from './types';
+import { AppView, Service, BookingState, Appointment, ChatMessage, ServiceExtra, Quote, VehicleCategory } from './types';
 import { SERVICES } from './constants';
 import { supabase } from './src/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -3822,8 +3822,12 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [editingService, setEditingService] = useState<Partial<Service>>({});
   const [durationParts, setDurationParts] = useState({ days: 0, hours: 0, mins: 0 });
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<VehicleCategory[]>([]);
 
   const fetchServices = async () => {
+    const { data: cats } = await supabase.from('vehicle_categories').select('*').order('display_order', { ascending: true });
+    if (cats) setCategories(cats);
+
     const { data: servicesData, error } = await supabase
       .from('services')
       .select('*')
@@ -3895,38 +3899,22 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       price: editingService.price,
       duration: totalMinutes,
       image_url: editingService.imageUrl,
+      category_id: editingService.category_id,
       is_active: true
     };
 
-    let error;
-    let savedService;
-    if (editingService.id) {
-      const { data, error: err } = await supabase
-        .from('services')
-        .update(payload)
-        .eq('id', editingService.id)
-        .select()
-        .single();
-      error = err;
-      savedService = data;
-    } else {
-      const { data, error: err } = await supabase
-        .from('services')
-        .insert(payload)
-        .select()
-        .single();
-      error = err;
-      savedService = data;
-    }
+    const { data: savedData, error: saveError } = editingService.id
+      ? await supabase.from('services').update(payload).eq('id', editingService.id).select().single()
+      : await supabase.from('services').insert(payload).select().single();
 
     setLoading(false);
-    if (error) {
-      console.error(error);
+    if (saveError) {
+      console.error(saveError);
       alert('Erro ao salvar serviço');
     } else {
       // If it was a new service, we stay in edit mode but with the ID now
-      if (!editingService.id && savedService) {
-        setEditingService({ ...editingService, id: savedService.id, extras: [] });
+      if (!editingService.id && savedData) {
+        setEditingService({ ...editingService, id: savedData.id, extras: [] });
       } else {
         setIsEditing(false);
         setEditingService({});
@@ -3952,9 +3940,31 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <div className="space-y-4">
           <input className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Nome do Serviço" value={editingService.name || ''} onChange={e => setEditingService({ ...editingService, name: e.target.value })} />
           <textarea className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 h-24 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Descrição" value={editingService.description || ''} onChange={e => setEditingService({ ...editingService, description: e.target.value })} />
-          <div className="space-y-1">
-            <label className="text-xs text-gray-500 font-bold ml-1">Preço (R$)</label>
-            <input type="number" className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="0.00" value={editingService.price || ''} onChange={e => setEditingService({ ...editingService, price: parseFloat(e.target.value) })} />
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold ml-1">Categoria do Veículo</label>
+              <select
+                className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white"
+                value={editingService.category_id || ''}
+                onChange={e => setEditingService({ ...editingService, category_id: parseInt(e.target.value) })}
+              >
+                <option value="">Selecione uma categoria</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 font-bold ml-1">Preço do Serviço (R$)</label>
+              <input
+                type="number"
+                className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400"
+                placeholder="0.00"
+                value={editingService.price ?? ''}
+                onChange={e => setEditingService({ ...editingService, price: parseFloat(e.target.value) })}
+              />
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -4145,6 +4155,59 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 };
 
 
+// --- Select Category Screen ---
+const SelectCategoryScreen: React.FC<{
+  categories: VehicleCategory[];
+  onSelect: (categoryId: string) => void;
+  onBack: () => void;
+}> = ({ categories, onSelect, onBack }) => {
+  const getIcon = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('moto')) return 'motorcycle';
+    if (n.includes('suv') || n.includes('pickup')) return 'shutter_speed';
+    if (n.includes('baixo')) return 'directions_car';
+    return 'directions_car';
+  };
+
+  return (
+    <div className="bg-gradient-to-b from-primary/20 to-white dark:bg-background-dark min-h-screen flex flex-col transition-colors">
+      <header className="sticky top-0 z-20 bg-white/95 dark:bg-background-dark/95 backdrop-blur-sm border-b border-gray-200 dark:border-white/5 flex items-center p-4 transition-colors">
+        <button onClick={onBack} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 transition-colors">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+        <h2 className="text-lg font-bold flex-1 text-center pr-10 text-slate-900 dark:text-white">Escolha sua Categoria</h2>
+      </header>
+      <main className="flex-1 p-6 max-w-md mx-auto w-full">
+        <div className="mb-10 text-center">
+          <h1 className="text-3xl font-extrabold mb-3 text-slate-900 dark:text-white">Selecione seu Veículo</h1>
+          <p className="text-gray-600 dark:text-gray-400">Escolha a categoria que melhor descreve seu veículo para ver os preços exatos.</p>
+        </div>
+        <div className="grid gap-6">
+          {categories.filter(c => c.is_visible).map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => onSelect(cat.id)}
+              className="group relative bg-white dark:bg-surface-dark p-6 rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm hover:border-primary dark:hover:border-primary hover:shadow-xl hover:shadow-primary/10 transition-all text-left overflow-hidden active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{cat.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Toque para selecionar e ver os serviços</p>
+                </div>
+                <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                  <span className="material-symbols-outlined text-2xl">{getIcon(cat.name)}</span>
+                </div>
+              </div>
+              <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-primary/5 to-transparent skew-x-12 translate-x-16 group-hover:translate-x-8 transition-transform"></div>
+            </button>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+
 // --- Theme Logic ---
 
 // --- Main App Logic ---
@@ -4157,6 +4220,7 @@ const App: React.FC = () => {
   const prevAppCountRef = useRef(0);
   const isFirstLoadRef = useRef(true);
   const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<VehicleCategory[]>([]);
 
   // Check for persistent login
   useEffect(() => {
@@ -4207,8 +4271,18 @@ const App: React.FC = () => {
   }, [currentUserRole]);
 
   /* Refactored fetchServicesList to be reused */
-  const fetchServicesList = async () => {
-    const { data: servicesData } = await supabase.from('services').select('*').eq('is_active', true).order('display_order', { ascending: true });
+  const fetchServicesList = async (categoryId?: string) => {
+    // Fetch categories first if not available
+    const { data: cats } = await supabase.from('vehicle_categories').select('*').order('display_order', { ascending: true });
+    if (cats) setCategories(cats);
+
+    let query = supabase.from('services').select('*').eq('is_active', true).order('display_order', { ascending: true });
+
+    if (categoryId) {
+      query = query.eq('category_id', parseInt(categoryId));
+    }
+
+    const { data: servicesData } = await query;
     const { data: extrasData } = await supabase.from('service_extras').select('*');
 
     if (servicesData) {
@@ -4584,8 +4658,8 @@ const App: React.FC = () => {
       case 'HOME':
         return <HomeScreen
           onAgendar={() => {
-            fetchServicesList(); // Refresh info
-            setView('SELECT_SERVICES');
+            fetchServicesList(); // Refresh categories and services
+            setView('SELECT_CATEGORY');
           }}
           onQuote={() => setView('CUSTOM_QUOTE')}
           onChat={() => { setCurrentUserRole('CUSTOMER'); setView('CHAT'); }}
@@ -4595,6 +4669,16 @@ const App: React.FC = () => {
           onMais={() => setView('LANDING')}
           address={localStorage.getItem('company_address') || ""}
           hours={JSON.parse(localStorage.getItem('business_hours') || "[]")}
+        />;
+      case 'SELECT_CATEGORY':
+        return <SelectCategoryScreen
+          categories={categories}
+          onSelect={(catId) => {
+            setBooking(prev => ({ ...prev, selectedCategoryId: catId }));
+            fetchServicesList(catId); // Refetch services with category prices
+            setView('SELECT_SERVICES');
+          }}
+          onBack={() => setView('HOME')}
         />;
       case 'SELECT_SERVICES':
         return <SelectServicesScreen

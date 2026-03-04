@@ -19,7 +19,15 @@ export type AppView =
   | 'ADMIN_CLIENTS'
   | 'ADMIN_WEEKLY_SCHEDULE'
   | 'CUSTOMER_LOGIN'
-  | 'CUSTOM_QUOTE';
+  | 'CUSTOM_QUOTE'
+  | 'SELECT_CATEGORY';
+
+export interface VehicleCategory {
+  id: string;
+  name: string;
+  is_visible: boolean;
+  display_order: number;
+}
 
 export interface Quote {
   id: string;
@@ -64,6 +72,7 @@ export interface Service {
   imageUrl: string;
   popular?: boolean;
   extras?: ServiceExtra[];
+  category_id?: number;
 }
 
 export interface Appointment {
@@ -85,6 +94,7 @@ export interface BookingState {
   selectedExtras: { [serviceId: string]: ServiceExtra[] };
   selectedDate: string; // Legacy/Main
   selectedTime: string; // Legacy/Main
+  selectedCategoryId?: string;
   selectedSlots?: { serviceId: string, date: string, time: string }[]; // New for multi-session
 }
 
