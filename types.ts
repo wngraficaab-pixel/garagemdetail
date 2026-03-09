@@ -73,6 +73,7 @@ export interface Service {
   popular?: boolean;
   extras?: ServiceExtra[];
   category_id?: number;
+  prices?: { category_id: number; price: number }[];
 }
 
 export interface Appointment {

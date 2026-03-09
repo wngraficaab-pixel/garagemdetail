@@ -3830,7 +3830,7 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const { data: servicesData, error } = await supabase
       .from('services')
-      .select('*')
+      .select('*, service_prices(*)')
       .eq('is_active', true)
       .order('display_order', { ascending: true });
 
@@ -3842,6 +3842,7 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         ...s,
         id: String(s.id),
         imageUrl: s.image_url,
+        prices: s.service_prices || [],
         extras: extrasData?.filter((e: any) => String(e.service_id) === String(s.id)) || []
       })));
     }
@@ -3887,8 +3888,13 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const handleSave = async () => {
     const totalMinutes = parseDuration(durationParts.days, durationParts.hours, durationParts.mins);
-    if (!editingService.name || !editingService.price || totalMinutes <= 0) {
+
+    // Check if at least one category has a price
+    const hasPrices = editingService.prices && editingService.prices.length > 0 && editingService.prices.every(p => p.price > 0);
+
+    if (!editingService.name || !hasPrices || totalMinutes <= 0) {
       if (totalMinutes <= 0) alert('A duração deve ser maior que zero');
+      else if (!hasPrices) alert('Defina os preços para todas as categorias');
       return;
     }
     setLoading(true);
@@ -3896,10 +3902,8 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const payload = {
       name: editingService.name,
       description: editingService.description,
-      price: editingService.price,
       duration: totalMinutes,
       image_url: editingService.imageUrl,
-      category_id: editingService.category_id,
       is_active: true
     };
 
@@ -3907,18 +3911,30 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       ? await supabase.from('services').update(payload).eq('id', editingService.id).select().single()
       : await supabase.from('services').insert(payload).select().single();
 
-    setLoading(false);
     if (saveError) {
       console.error(saveError);
       alert('Erro ao salvar serviço');
+      setLoading(false);
+      return;
+    }
+
+    // Save Prices
+    const serviceId = savedData.id;
+    const priceUpdates = editingService.prices!.map(p => ({
+      service_id: serviceId,
+      category_id: p.category_id,
+      price: p.price
+    }));
+
+    const { error: priceError } = await supabase.from('service_prices').upsert(priceUpdates, { onConflict: 'service_id,category_id' });
+
+    setLoading(false);
+    if (priceError) {
+      console.error(priceError);
+      alert('Erro ao salvar preços por categoria');
     } else {
-      // If it was a new service, we stay in edit mode but with the ID now
-      if (!editingService.id && savedData) {
-        setEditingService({ ...editingService, id: savedData.id, extras: [] });
-      } else {
-        setIsEditing(false);
-        setEditingService({});
-      }
+      setIsEditing(false);
+      setEditingService({});
       fetchServices();
     }
   };
@@ -3940,31 +3956,40 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <div className="space-y-4">
           <input className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Nome do Serviço" value={editingService.name || ''} onChange={e => setEditingService({ ...editingService, name: e.target.value })} />
           <textarea className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 h-24 text-slate-900 dark:text-white placeholder:text-gray-400" placeholder="Descrição" value={editingService.description || ''} onChange={e => setEditingService({ ...editingService, description: e.target.value })} />
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold ml-1">Categoria do Veículo</label>
-              <select
-                className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white"
-                value={editingService.category_id || ''}
-                onChange={e => setEditingService({ ...editingService, category_id: parseInt(e.target.value) })}
-              >
-                <option value="">Selecione uma categoria</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
+          <div className="space-y-4 bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+              <span className="material-symbols-outlined text-sm">payments</span>
+              Preços por Categoria
+            </h3>
+            {categories.map(cat => {
+              const currentPriceObj = editingService.prices?.find(p => String(p.category_id) === String(cat.id));
+              const currentPrice = currentPriceObj?.price || 0;
 
-            <div className="space-y-1">
-              <label className="text-xs text-gray-500 font-bold ml-1">Preço do Serviço (R$)</label>
-              <input
-                type="number"
-                className="w-full bg-white dark:bg-surface-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-gray-400"
-                placeholder="0.00"
-                value={editingService.price ?? ''}
-                onChange={e => setEditingService({ ...editingService, price: parseFloat(e.target.value) })}
-              />
-            </div>
+              return (
+                <div key={cat.id} className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-slate-700 dark:text-gray-300">{cat.name}</span>
+                  </div>
+                  <div className="w-32 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">R$</span>
+                    <input
+                      type="number"
+                      className="w-full bg-white dark:bg-surface-dark py-2.5 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-bold text-slate-900 dark:text-white"
+                      placeholder="0.00"
+                      value={currentPrice || ''}
+                      onChange={e => {
+                        const newPrice = parseFloat(e.target.value) || 0;
+                        const otherPrices = editingService.prices?.filter(p => String(p.category_id) !== String(cat.id)) || [];
+                        setEditingService({
+                          ...editingService,
+                          prices: [...otherPrices, { category_id: Number(cat.id), price: newPrice }]
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="space-y-1">
@@ -4121,7 +4146,9 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <img src={s.imageUrl} className="size-16 rounded-lg object-cover bg-gray-100 dark:bg-gray-800 pointer-events-none" />
                         <div className="flex-1">
                           <h3 className="font-bold text-slate-900 dark:text-white">{s.name}</h3>
-                          <p className="text-gray-500 dark:text-gray-400 text-xs">R$ {s.price.toFixed(2)} • {formatDuration(s.duration)}</p>
+                          <p className="text-gray-500 dark:text-gray-400 text-xs">
+                            R$ {(s.price || s.prices?.[0]?.price || 0).toFixed(2)} • {formatDuration(s.duration)}
+                          </p>
                         </div>
                         <div className="flex flex-col gap-2">
                           <button onClick={() => {
@@ -4163,7 +4190,7 @@ const SelectCategoryScreen: React.FC<{
 }> = ({ categories, onSelect, onBack }) => {
   const getIcon = (name: string) => {
     const n = name.toLowerCase();
-    if (n.includes('moto')) return 'motorcycle';
+    if (n.includes('moto')) return 'two_wheeler';
     if (n.includes('suv') || n.includes('pickup')) return 'shutter_speed';
     if (n.includes('baixo')) return 'directions_car';
     return 'directions_car';
@@ -4276,22 +4303,31 @@ const App: React.FC = () => {
     const { data: cats } = await supabase.from('vehicle_categories').select('*').order('display_order', { ascending: true });
     if (cats) setCategories(cats);
 
-    let query = supabase.from('services').select('*').eq('is_active', true).order('display_order', { ascending: true });
-
-    if (categoryId) {
-      query = query.eq('category_id', parseInt(categoryId));
-    }
+    let query = supabase
+      .from('services')
+      .select('*, service_prices(*)')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
 
     const { data: servicesData } = await query;
     const { data: extrasData } = await supabase.from('service_extras').select('*');
 
     if (servicesData) {
-      setServices(servicesData.map((s: any) => ({
-        ...s,
-        id: String(s.id),
-        imageUrl: s.image_url,
-        extras: extrasData?.filter((e: any) => String(e.service_id) === String(s.id)) || []
-      })));
+      setServices(servicesData.map((s: any) => {
+        // If categoryId is provided, get the specific price. Otherwise, provide a default or all prices.
+        const categoryPrice = categoryId
+          ? s.service_prices?.find((p: any) => String(p.category_id) === String(categoryId))?.price
+          : s.service_prices?.[0]?.price; // Fallback to first available price
+
+        return {
+          ...s,
+          id: String(s.id),
+          price: categoryPrice || 0,
+          imageUrl: s.image_url,
+          prices: s.service_prices, // Include all prices for Admin context
+          extras: extrasData?.filter((e: any) => String(e.service_id) === String(s.id)) || []
+        };
+      }));
     }
   };
 
