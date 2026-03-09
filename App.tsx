@@ -3257,6 +3257,214 @@ const AdminQuotesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
+// --- Walk-in Service Modal ---
+const AdminWalkInServiceModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  categories: VehicleCategory[];
+  allServices: any[];
+  onSave: (data: {
+    customerName: string;
+    categoryId: string;
+    services: any[];
+    extras: any[];
+    totalPrice: number;
+  }) => void;
+}> = ({ isOpen, onClose, categories, allServices, onSave }) => {
+  const [customerName, setCustomerName] = useState('Cliente Presencial');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
+  const [selectedExtras, setSelectedExtras] = useState<any[]>([]);
+  const [manualPrice, setManualPrice] = useState<string>('');
+
+  // Reset when opening
+  useEffect(() => {
+    if (isOpen) {
+      setCustomerName('Cliente Presencial');
+      setSelectedCategoryId(categories[0]?.id || '');
+      setSelectedServices([]);
+      setSelectedExtras([]);
+      setManualPrice('');
+    }
+  }, [isOpen, categories]);
+
+  if (!isOpen) return null;
+
+  const currentCategoryServices = allServices.map(s => {
+    const price = s.service_prices?.find((p: any) => String(p.category_id) === String(selectedCategoryId))?.price || 0;
+    return { ...s, currentPrice: price };
+  });
+
+  const calculatedTotal = selectedServices.reduce((sum, s) => sum + s.currentPrice, 0) +
+    selectedExtras.reduce((sum, e) => sum + e.price, 0);
+
+  const finalTotal = manualPrice !== '' ? parseFloat(manualPrice) : calculatedTotal;
+
+  const toggleService = (service: any) => {
+    if (selectedServices.find(s => s.id === service.id)) {
+      setSelectedServices(selectedServices.filter(s => s.id !== service.id));
+      // Remove extras for this service too
+      setSelectedExtras(selectedExtras.filter(e => String(e.service_id) !== String(service.id)));
+    } else {
+      setSelectedServices([...selectedServices, service]);
+    }
+  };
+
+  const toggleExtra = (extra: any) => {
+    if (selectedExtras.find(e => e.id === extra.id)) {
+      setSelectedExtras(selectedExtras.filter(e => e.id !== extra.id));
+    } else {
+      setSelectedExtras([...selectedExtras, extra]);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={onClose}>
+      <div className="bg-white dark:bg-surface-dark rounded-[40px] w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
+        <header className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50/50 dark:bg-white/2">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Venda Local</h3>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Sem agendamento</p>
+          </div>
+          <button onClick={onClose} className="size-10 rounded-full bg-white dark:bg-white/5 shadow-sm flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+          {/* Customer Info */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Cliente</label>
+            <input
+              type="text"
+              className="w-full bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/10 text-slate-900 dark:text-white font-bold"
+              placeholder="Nome do Cliente"
+              value={customerName}
+              onChange={e => setCustomerName(e.target.value)}
+            />
+          </div>
+
+          {/* Category Selector */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Categoria do Veículo</label>
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategoryId(cat.id);
+                    // Clear price override/recalculate if needed? Usually services change price.
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${selectedCategoryId === cat.id
+                    ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                    : 'bg-white dark:bg-white/5 text-gray-500 border-gray-200 dark:border-white/10'
+                    }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Services List */}
+          <div className="space-y-4">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Serviços Realizados</label>
+            <div className="grid gap-3">
+              {currentCategoryServices.map(s => {
+                const isSelected = selectedServices.some(sv => sv.id === s.id);
+                return (
+                  <div key={s.id} className="space-y-2">
+                    <button
+                      onClick={() => toggleService(s)}
+                      className={`w-full p-4 rounded-2xl border transition-all flex items-center gap-4 text-left ${isSelected
+                        ? 'bg-primary/5 border-primary shadow-sm'
+                        : 'bg-white dark:bg-white/2 border-gray-100 dark:border-white/5'
+                        }`}
+                    >
+                      <div className={`size-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-200 dark:border-white/10'}`}>
+                        {isSelected && <span className="material-symbols-outlined text-xs font-black">check</span>}
+                      </div>
+                      <div className="flex-1">
+                        <p className={`font-bold text-sm ${isSelected ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{s.name}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">R$ {s.currentPrice.toFixed(2).replace('.', ',')}</p>
+                      </div>
+                    </button>
+
+                    {/* Extras if service selected */}
+                    {isSelected && s.extras?.length > 0 && (
+                      <div className="ml-10 space-y-2">
+                        {s.extras.map((e: any) => {
+                          const isExtraSelected = selectedExtras.some(ex => ex.id === e.id);
+                          return (
+                            <button
+                              key={e.id}
+                              onClick={() => toggleExtra(e)}
+                              className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 text-left ${isExtraSelected
+                                ? 'bg-primary/5 border-primary/30'
+                                : 'bg-gray-50 dark:bg-white/2 border-gray-100 dark:border-white/5'
+                                }`}
+                            >
+                              <div className={`size-5 rounded-md border flex items-center justify-center transition-all ${isExtraSelected ? 'bg-primary border-primary text-white' : 'border-gray-200 dark:border-white/10'}`}>
+                                {isExtraSelected && <span className="material-symbols-outlined text-[10px] font-black">check</span>}
+                              </div>
+                              <div className="flex-1">
+                                <p className={`font-bold text-xs ${isExtraSelected ? 'text-primary' : 'text-slate-700 dark:text-gray-300'}`}>{e.name}</p>
+                                <p className="text-[10px] text-gray-400">R$ {e.price.toFixed(2).replace('.', ',')}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </main>
+
+        <footer className="p-6 bg-gray-50 dark:bg-white/2 border-t border-gray-100 dark:border-white/5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Total Geral</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">R$ {finalTotal.toFixed(2).replace('.', ',')}</span>
+                {manualPrice !== '' && <span className="text-[10px] text-primary font-bold">(Manual)</span>}
+              </div>
+            </div>
+            <div className="w-32">
+              <label className="text-[9px] text-gray-400 font-bold uppercase block text-right">Ajustar Valor</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="R$"
+                value={manualPrice}
+                onChange={e => setManualPrice(e.target.value)}
+                className="w-full bg-white dark:bg-background-dark p-2 rounded-xl border border-gray-200 dark:border-white/10 text-right text-xs font-bold text-primary"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => onSave({
+              customerName,
+              categoryId: selectedCategoryId,
+              services: selectedServices,
+              extras: selectedExtras,
+              totalPrice: finalTotal
+            })}
+            disabled={selectedServices.length === 0}
+            className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-xl shadow-primary/20 disabled:opacity-50 disabled:grayscale transition-all active:scale-[0.98]"
+          >
+            Finalizar Venda
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+
 const AdminDashboard: React.FC<{
   appointments: Appointment[];
   onLogout: () => void;
@@ -3267,13 +3475,14 @@ const AdminDashboard: React.FC<{
   onWeeklySchedule: () => void;
   onFinance: () => void;
   onQuotes: () => void;
+  onWalkIn: () => void;
   onTV: () => void;
   onRefresh: () => void;
   onClients: () => void;
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   unreadCount: number;
   unreadQuotesCount: number;
-}> = ({ appointments, onLogout, onOpenChat, onManageServices, onBlockSchedule, onSettings, onWeeklySchedule, onFinance, onQuotes, onTV, onRefresh, onClients, setAppointments, unreadCount, unreadQuotesCount }) => {
+}> = ({ appointments, onLogout, onOpenChat, onManageServices, onBlockSchedule, onSettings, onWeeklySchedule, onFinance, onQuotes, onWalkIn, onTV, onRefresh, onClients, setAppointments, unreadCount, unreadQuotesCount }) => {
   const availableDays = useMemo(() => getNextDays(7), []);
   const [selectedDateStr, setSelectedDateStr] = useState(availableDays[0].dateStr); // Default to local today string
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -3407,6 +3616,19 @@ const AdminDashboard: React.FC<{
             <div className="text-left">
               <h3 className="font-bold text-slate-900 dark:text-white">Orçamentos</h3>
               <p className="text-violet-500 text-[10px] font-bold uppercase tracking-widest">Personalizados</p>
+            </div>
+          </button>
+
+          <button
+            onClick={onWalkIn}
+            className="relative group flex flex-col p-4 rounded-3xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-white/5 hover:border-primary/30 active:scale-[0.98] transition-all overflow-hidden shadow-lg h-32 justify-between"
+          >
+            <div className="size-10 rounded-xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              <span className="material-symbols-outlined filled">store</span>
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-slate-900 dark:text-white">Venda Local</h3>
+              <p className="text-blue-500 text-[10px] font-bold uppercase tracking-widest">Sem Agendamento</p>
             </div>
           </button>
 
@@ -4445,6 +4667,7 @@ const App: React.FC = () => {
   }, []);
 
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
@@ -4697,6 +4920,66 @@ const App: React.FC = () => {
     }, 3000);
   };
 
+  const handleSaveWalkIn = async (data: {
+    customerName: string;
+    categoryId: string;
+    services: any[];
+    extras: any[];
+    totalPrice: number;
+  }) => {
+    const now = new Date();
+    const todayStr = format(now, 'yyyy-MM-dd');
+    const timeStr = format(now, 'HH:mm:ss');
+
+    // 1. Find or create client
+    let clientId: string | undefined;
+    const { data: client } = await supabase.from('clients').select('id').eq('name', data.customerName).limit(1);
+    if (client && client.length > 0) {
+      clientId = client[0].id;
+    } else {
+      const { data: newClient } = await supabase.from('clients').insert({ name: data.customerName }).select().single();
+      if (newClient) clientId = newClient.id;
+    }
+
+    // 2. Insert Appointment as COMPLETED
+    const { data: appData, error: appError } = await supabase.from('appointments').insert({
+      client_id: clientId,
+      appointment_date: todayStr,
+      appointment_time: timeStr,
+      total_price: data.totalPrice,
+      status: 'COMPLETED',
+      category_id: data.categoryId
+    }).select().single();
+
+    if (appError) {
+      alert('Erro ao salvar venda: ' + appError.message);
+      return;
+    }
+
+    // 3. Insert Services
+    if (data.services.length > 0) {
+      await supabase.from('appointment_services').insert(data.services.map(s => ({
+        appointment_id: appData.id,
+        service_id: s.id,
+        price_at_booking: s.currentPrice
+      })));
+    }
+
+    // 4. Insert Extras
+    if (data.extras.length > 0) {
+      await supabase.from('appointment_extras').insert(data.extras.map(e => ({
+        appointment_id: appData.id,
+        extra_id: e.id,
+        name: e.name,
+        price_at_booking: e.price
+      })));
+    }
+
+    setShowWalkInModal(false);
+    fetchAppointments();
+    alert('Venda local registrada com sucesso!');
+  };
+
   const renderView = () => {
     switch (view) {
       case 'LANDING':
@@ -4779,6 +5062,7 @@ const App: React.FC = () => {
           onWeeklySchedule={() => setView('ADMIN_WEEKLY_SCHEDULE')}
           onFinance={() => setView('ADMIN_FINANCE')}
           onTV={() => setView('ADMIN_TV')}
+          onWalkIn={() => setShowWalkInModal(true)}
 
           onRefresh={fetchAppointments}
           onClients={() => setView('ADMIN_CLIENTS')}
@@ -4871,6 +5155,13 @@ const App: React.FC = () => {
         onClose={() => setNotificationState(prev => ({ ...prev, visible: false }))}
       />
       {renderView()}
+      <AdminWalkInServiceModal
+        isOpen={showWalkInModal}
+        onClose={() => setShowWalkInModal(false)}
+        categories={categories}
+        allServices={services}
+        onSave={handleSaveWalkIn}
+      />
       <ReloadPrompt />
     </div>
   );
