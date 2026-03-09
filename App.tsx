@@ -3689,17 +3689,24 @@ const AdminDashboard: React.FC<{
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-base text-slate-900 dark:text-white truncate">{app.customerName}</h4>
-                          <p className="text-xs text-gray-500 font-medium truncate opacity-80">
-                            {app.services.map(s => s.name).join(' + ')}
-                            {(() => {
-                              const extras = Object.values(app.selectedExtras || {}).flat();
-                              return extras.length > 0 && (
-                                <span className="text-primary font-bold">
-                                  {" + "}{extras.map((e: any) => e.name).join(' + ')}
-                                </span>
-                              );
-                            })()}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {app.categoryName && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
+                                {app.categoryName}
+                              </span>
+                            )}
+                            <p className="text-xs text-gray-500 font-medium truncate opacity-80">
+                              {app.services.map(s => s.name).join(' + ')}
+                              {(() => {
+                                const extras = Object.values(app.selectedExtras || {}).flat();
+                                return extras.length > 0 && (
+                                  <span className="text-primary font-bold">
+                                    {" + "}{extras.map((e: any) => e.name).join(' + ')}
+                                  </span>
+                                );
+                              })()}
+                            </p>
+                          </div>
                         </div>
 
                         {/* <div className="relative">
@@ -4467,7 +4474,8 @@ const App: React.FC = () => {
                     service:services(*)
                   ),
                   extras:appointment_extras(*),
-                  clients(name, phone)
+                  clients(name, phone),
+                  vehicle_categories(name)
                   `)
       .order('appointment_date', { ascending: true })
       .order('appointment_time', { ascending: true });
@@ -4503,6 +4511,7 @@ const App: React.FC = () => {
         totalPrice: a.total_price,
         customerName: a.clients?.name || 'Cliente',
         customerPhone: a.clients?.phone || '',
+        categoryName: a.vehicle_categories?.name || '',
         services: a.services.map((s: any) => ({
           ...s.service,
           imageUrl: s.service.image_url
@@ -4628,7 +4637,7 @@ const App: React.FC = () => {
       const isBlocked = dayBlocks?.some(b => b.time?.startsWith(slot.time));
 
       if (isTaken || isBlocked) {
-        alert(`O horário ${slot.date} às ${slot.time} para ${service.name} acabou de ser reservado ou bloqueado. Volte e escolha outro.`);
+        alert(`O horário ${slot.date} às ${slot.time} para ${service.name} acabou de ser reservado ou bloqueado.Volte e escolha outro.`);
         allSuccess = false;
         break;
       }
@@ -4639,7 +4648,8 @@ const App: React.FC = () => {
         appointment_date: slot.date,
         appointment_time: slot.time,
         total_price: slotPrice,
-        status: 'PENDING'
+        status: 'PENDING',
+        category_id: booking.selectedCategoryId
       }).select().single();
 
       if (appError || !appData) {

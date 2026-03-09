@@ -86,6 +86,7 @@ export interface Appointment {
   time: string; // HH:mm
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+  categoryName?: string;
 }
 
 export interface BookingState {
