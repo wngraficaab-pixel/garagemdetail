@@ -4751,9 +4751,15 @@ const App: React.FC = () => {
           appointments={appointments}
           unreadCount={unreadCount}
           unreadQuotesCount={unreadQuotesCount}
-          onLogout={() => {
+          onLogout={async () => {
             localStorage.removeItem('admin_auth');
-            supabase.auth.signOut();
+            localStorage.removeItem('last_admin_view');
+            try {
+              await supabase.auth.signOut();
+            } catch (err) {
+              console.warn('Sign out error (ignoring):', err);
+            }
+            setCurrentUserRole('CUSTOMER');
             setView('LANDING');
           }}
           onOpenChat={() => { setCurrentUserRole('BARBER'); setView('ADMIN_CHAT_LIST'); }}
