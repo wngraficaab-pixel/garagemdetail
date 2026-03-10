@@ -307,7 +307,7 @@ const LandingScreen: React.FC<{ onStart: () => void; onAdmin: () => void }> = ({
           {localStorage.getItem('company_name') || "Garagem Detail"}
         </h1>
         <p className="text-gray-600 dark:text-gray-300 text-base text-center max-w-xs opacity-90 whitespace-pre-line">
-          {localStorage.getItem('company_tagline') || "Seu estilo, no seu tempo.\nAgende seu corte em segundos."}
+          {localStorage.getItem('company_tagline') || "Seu estilo, no seu tempo.\nAgende seu serviço em segundos."}
         </p>
       </div>
     </div>
@@ -341,7 +341,7 @@ const HomeScreen: React.FC<{
     </header>
     <main className="flex-1 flex flex-col px-4 pt-4">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Vamos agendar o seu<br />corte?</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Vamos agendar o seu<br />serviço?</h1>
       </div>
       <div className="grid grid-cols-2 gap-3 mb-6">
         <button onClick={onAgendar} className="relative group flex flex-col items-start justify-end p-4 h-40 w-full rounded-2xl overflow-hidden shadow-lg hover:shadow-xl active:scale-[0.98] transition-all">
@@ -2387,7 +2387,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [profileName, setProfileName] = useState('Renan Sandes');
   const [profileImage, setProfileImage] = useState('/renan.png');
   const [companyName, setCompanyName] = useState('Garagem Detail');
-  const [companyTagline, setCompanyTagline] = useState('Seu estilo, no seu tempo. Agende seu corte em segundos.');
+  const [companyTagline, setCompanyTagline] = useState('Seu estilo, no seu tempo. Agende seu serviço em segundos.');
   const [companyAddress, setCompanyAddress] = useState('Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
   const [tolerance, setTolerance] = useState('45');
 
@@ -2405,7 +2405,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setProfileName(s.profile_name || 'Renan Sandes');
         setProfileImage(s.profile_image || '/renan.png');
         setCompanyName(s.company_name || 'Garagem Detail');
-        setCompanyTagline(s.company_tagline || 'Seu estilo, no seu tempo. Agende seu corte em segundos.');
+        setCompanyTagline(s.company_tagline || 'Seu estilo, no seu tempo. Agende seu serviço em segundos.');
         setCompanyAddress(s.company_address || 'Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
         setTolerance(s.booking_tolerance || '45');
       }
@@ -2487,7 +2487,7 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" />
           </div>
           <div>
-            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Intervalo entre Cortes (min)</label>
+            <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Intervalo entre Serviços (min)</label>
             <select value={interval} onChange={e => setInterval(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white">
               <option value="15">15 minutos</option>
               <option value="20">20 minutos</option>
