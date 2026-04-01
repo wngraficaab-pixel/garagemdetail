@@ -28,7 +28,7 @@ Tabela de ligação, pois um agendamento pode ter vários serviços (ex: Corte +
 ### 5. `chat_messages` (Chat)
 Histórico de mensagens.
 *   **client_id**: De quem é a conversa.
-*   **sender_type**: Quem enviou (Cliente, Barbeiro ou Sistema).
+*   **sender_type**: Quem enviou (Cliente, Dono ou Sistema).
 *   **message_text**: O conteúdo.
 
 ## Como usar

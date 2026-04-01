@@ -358,7 +358,7 @@ const HomeScreen: React.FC<{
         </button>
         <button onClick={onChat} className="relative group flex flex-col items-start justify-end p-4 h-40 w-full rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-white/5 active:scale-[0.98] transition-all">
           <div className="absolute inset-0 z-0">
-            <img alt="Gerente" className="h-full w-full object-cover" src={localStorage.getItem('profile_image') || "/renan.png"} />
+            <img alt="Gerente" className="h-full w-full object-cover" src={localStorage.getItem('profile_image') || "/arthur.png"} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
           </div>
           <div className="relative z-10 flex flex-col items-start gap-1">
@@ -2087,8 +2087,8 @@ const ChatScreen: React.FC<{
     setInputText('');
   };
 
-  const otherPersonName = currentUserRole === 'CUSTOMER' ? 'Renan Sandes' : (customerIdentity?.name || 'Cliente');
-  const otherPersonRole = currentUserRole === 'CUSTOMER' ? 'Barbeiro' : 'Cliente';
+  const otherPersonName = currentUserRole === 'CUSTOMER' ? 'Arthur' : (customerIdentity?.name || 'Cliente');
+  const otherPersonRole = currentUserRole === 'CUSTOMER' ? 'Dono' : 'Cliente';
 
   if (needsIdentity) {
     return (
@@ -2115,7 +2115,7 @@ const ChatScreen: React.FC<{
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="size-10 rounded-full bg-gray-200 dark:bg-surface-dark border border-gray-200 dark:border-white/5 flex items-center justify-center overflow-hidden">
-          <img src={currentUserRole === 'CUSTOMER' ? "/renan.png" : "/logo.png"} alt="Avatar" className="h-full w-full object-cover" />
+          <img src={currentUserRole === 'CUSTOMER' ? "/arthur.png" : "/logo.png"} alt="Avatar" className="h-full w-full object-cover" />
         </div>
         <div>
           <h2 className="font-bold text-sm text-slate-900 dark:text-white">{otherPersonName}</h2>
@@ -2127,19 +2127,33 @@ const ChatScreen: React.FC<{
       </header>
 
       <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-gray-50 dark:bg-background-dark transition-colors">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === currentUserRole ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.sender === currentUserRole
-              ? 'bg-primary text-white rounded-tr-none shadow-lg shadow-primary/10'
-              : 'bg-white dark:bg-surface-dark text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-200 dark:border-white/5 shadow-sm'
-              }`}>
-              {msg.text}
-              <div className={`text-[10px] mt-1 opacity-50 ${msg.sender === currentUserRole ? 'text-right' : 'text-left'}`}>
-                {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        {messages.map((msg) => {
+          const isMe = msg.sender === currentUserRole;
+          const showAvatar = !isMe && ((currentUserRole === 'CUSTOMER' && msg.sender === 'BARBER') || (currentUserRole === 'BARBER' && msg.sender === 'CUSTOMER'));
+
+          return (
+            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2`}>
+              {!isMe && (
+                <div className="size-8 rounded-full bg-gray-200 dark:bg-surface-dark overflow-hidden shrink-0 border border-gray-200 dark:border-white/5">
+                  <img
+                    src={msg.sender === 'BARBER' ? "/arthur.png" : "/logo.png"}
+                    alt="Avatar"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${isMe
+                ? 'bg-primary text-white rounded-tr-none shadow-lg shadow-primary/10'
+                : 'bg-white dark:bg-surface-dark text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-200 dark:border-white/5 shadow-sm'
+                }`}>
+                {msg.text}
+                <div className={`text-[10px] mt-1 opacity-50 ${isMe ? 'text-right' : 'text-left'}`}>
+                  {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </main>
 
       <footer className="p-4 bg-white/95 dark:bg-surface-dark/50 border-t border-gray-200 dark:border-white/5 pb-8 transition-colors">
@@ -2384,8 +2398,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [interval, setInterval] = useState('30');
   const [lunchStart, setLunchStart] = useState('');
   const [lunchEnd, setLunchEnd] = useState('');
-  const [profileName, setProfileName] = useState('Renan Sandes');
-  const [profileImage, setProfileImage] = useState('/renan.png');
+  const [profileName, setProfileName] = useState('Arthur');
+  const [profileImage, setProfileImage] = useState('/arthur.png');
   const [companyName, setCompanyName] = useState('Garagem Detail');
   const [companyTagline, setCompanyTagline] = useState('Seu estilo, no seu tempo. Agende seu serviço em segundos.');
   const [companyAddress, setCompanyAddress] = useState('Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
@@ -2402,8 +2416,8 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setInterval(s.interval_minutes || '30');
         setLunchStart(s.lunch_start || '');
         setLunchEnd(s.lunch_end || '');
-        setProfileName(s.profile_name || 'Renan Sandes');
-        setProfileImage(s.profile_image || '/renan.png');
+        setProfileName(s.profile_name || 'Arthur');
+        setProfileImage(s.profile_image || '/arthur.png');
         setCompanyName(s.company_name || 'Garagem Detail');
         setCompanyTagline(s.company_tagline || 'Seu estilo, no seu tempo. Agende seu serviço em segundos.');
         setCompanyAddress(s.company_address || 'Rua Osman Loureiro, 33\nCentro, Água Branca - AL');
@@ -2469,11 +2483,11 @@ const AdminSettingsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-primary">person</span> Perfil do Profissional</h3>
           <div>
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Nome do Profissional</label>
-            <input type="text" value={profileName} onChange={e => setProfileName(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: Renan Sandes" />
+            <input type="text" value={profileName} onChange={e => setProfileName(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: Arthur" />
           </div>
           <div>
             <label className="text-gray-500 dark:text-gray-400 text-sm block mb-1">URL da Foto</label>
-            <input type="text" value={profileImage} onChange={e => setProfileImage(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: /renan.png ou link externo" />
+            <input type="text" value={profileImage} onChange={e => setProfileImage(e.target.value)} className="w-full bg-gray-50 dark:bg-background-dark p-3 rounded-lg border border-gray-200 dark:border-white/10 text-slate-900 dark:text-white" placeholder="Ex: /arthur.png ou link externo" />
           </div>
 
           <div className="pt-4 border-t border-gray-100 dark:border-white/5"></div>
@@ -2572,10 +2586,10 @@ const LoginScreen: React.FC<{ onLogin: () => void; onBack: () => void }> = ({ on
       <div className="flex flex-col items-center mb-10">
         <div className="size-24 rounded-full bg-white dark:bg-surface-dark border-4 border-gray-100 dark:border-white/5 flex items-center justify-center overflow-hidden relative group shadow-lg transition-colors">
           {/* <span className="material-symbols-outlined text-4xl text-gray-500">person</span> */}
-          <img src={localStorage.getItem('profile_image') || "/renan.png"} className="h-full w-full object-cover" />
+          <img src={localStorage.getItem('profile_image') || "/arthur.png"} className="h-full w-full object-cover" />
           <div className="absolute bottom-0 right-0 bg-primary p-1.5 rounded-full border-2 border-white dark:border-background-dark shadow-md"><span className="material-symbols-outlined text-xs text-white">photo_camera</span></div>
         </div>
-        <span className="text-primary text-sm font-bold mt-3">{localStorage.getItem('profile_name') || "Renan Sandes"}</span>
+        <span className="text-primary text-sm font-bold mt-3">{localStorage.getItem('profile_name') || "Arthur"}</span>
       </div>
       <div className="space-y-4 mb-10">
         <div className="relative">
@@ -3578,7 +3592,7 @@ const AdminDashboard: React.FC<{
           </div>
           <div>
             <h2 className="font-bold leading-none text-slate-900 dark:text-white">Agenda</h2>
-            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">{localStorage.getItem('profile_name') || "Renan Sandes"}</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">{localStorage.getItem('profile_name') || "Arthur"}</span>
           </div>
         </div>
         <button onClick={onLogout} className="size-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 text-gray-400 transition-colors">
@@ -4477,6 +4491,18 @@ const App: React.FC = () => {
   const isFirstLoadRef = useRef(true);
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<VehicleCategory[]>([]);
+
+  useEffect(() => {
+    // Migrate or reset profile image if it points to old or AI-generated versions
+    const currentPI = localStorage.getItem('profile_image');
+    if (currentPI?.includes('supabase') || currentPI === '/renan.png') {
+      localStorage.removeItem('profile_image');
+    }
+    const currentPN = localStorage.getItem('profile_name');
+    if (currentPN === 'Renan Sandes') {
+      localStorage.removeItem('profile_name');
+    }
+  }, []);
 
   // Check for persistent login
   useEffect(() => {
