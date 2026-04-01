@@ -4600,8 +4600,14 @@ const App: React.FC = () => {
     const { data: extrasData } = await supabase.from('service_extras').select('*');
 
     if (servicesData) {
-      setServices(servicesData.map((s: any) => {
-        // If categoryId is provided, get the specific price. Otherwise, provide a default or all prices.
+      // Filter only those that have a price for the selected category
+      let filtered = servicesData;
+      if (categoryId) {
+        filtered = servicesData.filter(s => s.service_prices?.some((p: any) => String(p.category_id) === String(categoryId)));
+      }
+
+      setServices(filtered.map((s: any) => {
+        // If categoryId is provided, get the specific price.
         const categoryPrice = categoryId
           ? s.service_prices?.find((p: any) => String(p.category_id) === String(categoryId))?.price
           : s.service_prices?.[0]?.price; // Fallback to first available price
