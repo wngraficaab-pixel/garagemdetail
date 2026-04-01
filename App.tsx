@@ -4167,13 +4167,24 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     // Save Prices
     const serviceId = savedData.id;
+
+    // First, delete ALL existing prices for this service to ensure we handle removals correctly
+    const { error: deleteError } = await supabase.from('service_prices').delete().eq('service_id', serviceId);
+
+    if (deleteError) {
+      console.error(deleteError);
+    }
+
+    // Now, only insert the ones that are enabled (have a price record in editingService.prices)
     const priceUpdates = editingService.prices!.map(p => ({
       service_id: serviceId,
       category_id: p.category_id,
       price: p.price
     }));
 
-    const { error: priceError } = await supabase.from('service_prices').upsert(priceUpdates, { onConflict: 'service_id,category_id' });
+    const { error: priceError } = priceUpdates.length > 0
+      ? await supabase.from('service_prices').insert(priceUpdates)
+      : { error: null };
 
     setLoading(false);
     if (priceError) {
@@ -4210,20 +4221,37 @@ const AdminServicesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </h3>
             {categories.map(cat => {
               const currentPriceObj = editingService.prices?.find(p => String(p.category_id) === String(cat.id));
+              const isEnabled = !!currentPriceObj;
               const currentPrice = currentPriceObj?.price || 0;
 
               return (
-                <div key={cat.id} className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-slate-700 dark:text-gray-300">{cat.name}</span>
+                <div key={cat.id} className="flex items-center gap-4 group">
+                  <div className="flex-1 flex items-center gap-3">
+                    <div
+                      onClick={() => {
+                        const otherPrices = editingService.prices?.filter(p => String(p.category_id) !== String(cat.id)) || [];
+                        if (isEnabled) {
+                          setEditingService({ ...editingService, prices: otherPrices });
+                        } else {
+                          setEditingService({ ...editingService, prices: [...otherPrices, { category_id: Number(cat.id), price: 0 }] });
+                        }
+                      }}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${isEnabled ? 'bg-primary' : 'bg-gray-200 dark:bg-white/10'}`}
+                    >
+                      <span className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEnabled ? 'translate-x-4.5' : 'translate-x-1'}`}></span>
+                    </div>
+                    <span className={`text-sm font-medium transition-colors ${isEnabled ? 'text-slate-900 dark:text-white' : 'text-gray-400'}`}>
+                      {cat.name}
+                    </span>
                   </div>
-                  <div className="w-32 relative">
+                  <div className={`w-32 relative transition-all duration-300 ${isEnabled ? 'opacity-100 scale-100' : 'opacity-30 scale-95 pointer-events-none grayscale'}`}>
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">R$</span>
                     <input
                       type="number"
-                      className="w-full bg-white dark:bg-surface-dark py-2.5 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-bold text-slate-900 dark:text-white"
+                      className="w-full bg-white dark:bg-surface-dark py-2.5 pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none"
                       placeholder="0.00"
                       value={currentPrice || ''}
+                      disabled={!isEnabled}
                       onChange={e => {
                         const newPrice = parseFloat(e.target.value) || 0;
                         const otherPrices = editingService.prices?.filter(p => String(p.category_id) !== String(cat.id)) || [];
