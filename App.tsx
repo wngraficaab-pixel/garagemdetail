@@ -1045,8 +1045,12 @@ const SelectDateTimeScreen: React.FC<{
 
         // --- 1. Shift End Check ---
         // If duration is <= 1 day, it must fit in the current shift (considering tolerance)
+        // Optimization for Detailing: if duration > 4 hours, allow it to span into the next shift of the same day.
         if (myDuration <= 1440) {
-          if (currentSlotStart + myDuration > (shiftEndMins + toleranceMins)) break;
+          const totalDayEndMins = dayConfig.end_time_2 ? toMins(dayConfig.end_time_2) : shiftEndMins;
+          const effectiveEndMins = myDuration > 240 ? totalDayEndMins : shiftEndMins;
+
+          if (currentSlotStart + myDuration > (effectiveEndMins + toleranceMins)) break;
         } else {
           // If duration is > 1 day, it just needs to START within the shift
           if (currentSlotStart >= shiftEndMins) break;
